@@ -70,7 +70,7 @@ impl<'a> Tokenizer<'a> {
 
     /// Detects simple tokens such as operators at the beginning of source, returning
     /// the new source with the token stripped away if successful.
-    fn recognize_simple_token(&mut self, source: &'a str) -> Option<&'a str> {
+    fn recognize_multichar_token(&mut self, source: &'a str) -> Option<&'a str> {
         // Order of these matters
         recognize!(self, source, "..=", Tight);
         recognize!(self, source, "...", Tight);
@@ -116,7 +116,9 @@ impl<'a> Tokenizer<'a> {
             let (str, remainder) = source.split_at(len);
             source = remainder;
 
-            if let Some(remainder) = tokenizer.recognize_simple_token(source) {
+            // rustc_lexer's tokens are very granular, as in two &'s instead of
+            // an &&, so we recognize multicharacter tokens like operators manually.
+            if let Some(remainder) = tokenizer.recognize_multichar_token(source) {
                 source = remainder;
             }
 

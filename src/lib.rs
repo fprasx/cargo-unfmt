@@ -2,32 +2,64 @@ use std::fmt::Display;
 
 use rustc_lexer::{Token, TokenKind};
 
+const JUNK: &[&str] = &[
+    ";",
+    "{}",
+    "();",
+    "{;};",
+    "({});",
+    "{();};",
+    "*&*&();",
+    "((),());",
+    "let _=();",
+    "if(true){}",
+    "let _=||();",
+    "loop{break;}",
+    "if let _=(){}",
+    "while(false){}",
+];
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Morpheme<'a> {
-    Repel(&'a str),
-    RepelRight(&'a str),
-    Tight(&'a str),
+pub enum MorphemeKind {
+    Repel,
+    RepelRight,
+    Tight,
 }
 
-impl Morpheme<'_> {
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct Morpheme<'a> {
+    str: &'a str,
+    kind: MorphemeKind,
+}
+
+impl<'a> Morpheme<'a> {
+    fn new(str: &'a str, kind: MorphemeKind) -> Self {
+        Self { str, kind }
+    }
+
+    #[cfg(test)]
+    fn repel(str: &'a str) -> Self {
+        Morpheme::new(str, MorphemeKind::Repel)
+    }
+
+    #[cfg(test)]
+    fn repel_right(str: &'a str) -> Self {
+        Morpheme::new(str, MorphemeKind::RepelRight)
+    }
+
+    #[cfg(test)]
+    fn tight(str: &'a str) -> Self {
+        Morpheme::new(str, MorphemeKind::Tight)
+    }
+
     fn len(&self) -> usize {
-        let str = match self {
-            Morpheme::Repel(s) => s,
-            Morpheme::Tight(s) => s,
-            Morpheme::RepelRight(s) => s,
-        };
-        str.len()
+        self.str.len()
     }
 }
 
 impl Display for Morpheme<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            Morpheme::Repel(s) => s,
-            Morpheme::Tight(s) => s,
-            Morpheme::RepelRight(s) => s,
-        };
-        write!(f, "{str}")
+        write!(f, "{}", self.str)
     }
 }
 
@@ -39,8 +71,9 @@ pub struct Tokens<'a> {
 macro_rules! recognize {
     ($source:ident, $tokens:ident, $token:literal, $tokenfn:ident) => {
         if let Some(remainder) = $source.strip_prefix($token) {
-            $tokens.push(Morpheme::$tokenfn($token));
+            $tokens.push(Morpheme::new($token, MorphemeKind::$tokenfn));
             $source = remainder;
+            continue;
         }
     };
 }
@@ -91,29 +124,28 @@ impl<'a> Tokens<'a> {
             source = remainder;
 
             let mtype = match kind {
-                TokenKind::Ident => Morpheme::Repel,
-                TokenKind::Lifetime { .. } => Morpheme::RepelRight,
+                TokenKind::Ident => MorphemeKind::Repel,
+                TokenKind::Lifetime { .. } => MorphemeKind::RepelRight,
                 TokenKind::Literal { kind, .. } => match kind {
-                    rustc_lexer::LiteralKind::Int { .. } => Morpheme::Repel,
-                    rustc_lexer::LiteralKind::Float { .. } => Morpheme::Repel,
-                    rustc_lexer::LiteralKind::Char { .. } => Morpheme::Repel,
-                    rustc_lexer::LiteralKind::Byte { .. } => Morpheme::Repel,
-                    rustc_lexer::LiteralKind::Str { .. } => Morpheme::Repel,
-                    rustc_lexer::LiteralKind::ByteStr { .. } => Morpheme::Repel,
-                    rustc_lexer::LiteralKind::RawStr { .. } => Morpheme::Repel,
-                    rustc_lexer::LiteralKind::RawByteStr { .. } => Morpheme::Repel,
+                    rustc_lexer::LiteralKind::Int { .. } => MorphemeKind::Repel,
+                    rustc_lexer::LiteralKind::Float { .. } => MorphemeKind::Repel,
+                    rustc_lexer::LiteralKind::Char { .. } => MorphemeKind::Repel,
+                    rustc_lexer::LiteralKind::Byte { .. } => MorphemeKind::Repel,
+                    rustc_lexer::LiteralKind::Str { .. } => MorphemeKind::Repel,
+                    rustc_lexer::LiteralKind::ByteStr { .. } => MorphemeKind::Repel,
+                    rustc_lexer::LiteralKind::RawStr { .. } => MorphemeKind::Repel,
+                    rustc_lexer::LiteralKind::RawByteStr { .. } => MorphemeKind::Repel,
                 },
                 TokenKind::Whitespace | TokenKind::LineComment | TokenKind::BlockComment { .. } => {
                     continue;
                 }
-                TokenKind::Colon => Morpheme::Tight,
-                _ => Morpheme::Tight,
+                TokenKind::Colon => MorphemeKind::Tight,
+                _ => MorphemeKind::Tight,
             };
-            tokens.push(mtype(str));
+            tokens.push(Morpheme::new(str, mtype));
         }
         Self { tokens }
     }
-
 }
 
 pub trait Unformat<'a> {
@@ -123,25 +155,33 @@ pub trait Unformat<'a> {
 pub struct BlockUnformatter<const N: usize>;
 
 fn append(buf: &mut String, last: &Morpheme, token: &Morpheme) -> usize {
-    match (last, token) {
-        (Morpheme::Repel(_) | Morpheme::RepelRight(_), Morpheme::Repel(t)) => {
-            buf.push_str(&format!(" {t}"));
+    match (last.kind, token.kind) {
+        (MorphemeKind::Repel | MorphemeKind::RepelRight, MorphemeKind::Repel) => {
+            buf.push_str(&format!(" {}", token.str));
             1 + token.len()
         }
-        // let x: ::std... should not become let x:::std....
-        (Morpheme::Tight(":"), Morpheme::Tight("::")) => {
-            buf.push_str(&format!(" ::"));
-            3
-        }
-        // / and * fuse to become /*, the start of a comment
-        (Morpheme::Tight("/"), Morpheme::Tight("*")) => {
-            buf.push_str(" *");
-            2
-        }
-        // For some reason it doesn't like <-, so < -1 needs can't become <-1
-        (Morpheme::Tight("<"), Morpheme::Tight("-")) => {
-            buf.push_str(" -");
-            2
+        (MorphemeKind::Tight, MorphemeKind::Tight) => {
+            match (last.str, token.str) {
+                // let x: ::std... should not become let x:::std....
+                (":", "::") => {
+                    buf.push_str(" ::");
+                    3
+                }
+                // / and * fuse to become /*, the start of a comment
+                ("/", "*") => {
+                    buf.push_str(" *");
+                    2
+                }
+                // For some reason it doesn't like <-, so < -1 needs can't become <-1
+                ("<", "-") => {
+                    buf.push_str(" -");
+                    2
+                }
+                _ => {
+                    buf.push_str(&token.to_string());
+                    token.len()
+                }
+            }
         }
         _ => {
             buf.push_str(&token.to_string());
@@ -196,9 +236,9 @@ mod tests {
             Tokens::tokenize("use it fn"),
             Tokens {
                 tokens: vec![
-                    Morpheme::Repel("use"),
-                    Morpheme::Repel("it"),
-                    Morpheme::Repel("fn"),
+                    Morpheme::repel("use"),
+                    Morpheme::repel("it"),
+                    Morpheme::repel("fn"),
                 ],
             }
         )
@@ -209,23 +249,28 @@ mod tests {
         assert_eq!(
             Tokens::tokenize("'a ident"),
             Tokens {
-                tokens: vec![Morpheme::RepelRight("'a"), Morpheme::Repel("ident")]
+                tokens: vec![Morpheme::repel_right("'a"), Morpheme::repel("ident")]
             }
         )
     }
 
-    /// This situation can happen for something like:
-    /// ```rust
-    /// let x: ::std::usize = 1;
-    /// ```
-    /// We don't want to emit `:::`
     #[test]
-    fn colons_repel() {
+    fn repel_special_cases() {
+        // for cases like let x: ::std::usize ...
         assert_eq!(
-            Tokens::tokenize(":::"),
-            Tokens {
-                tokens: vec![Morpheme::RepelColon("::"), Morpheme::RepelColon(":")]
-            }
-        )
+            BlockUnformatter::<80>.unformat(Tokens::tokenize(": ::").tokens()),
+            ": ::",
+        );
+        // for cases like: let x = y / *z;
+        assert_eq!(
+            BlockUnformatter::<80>.unformat(Tokens::tokenize("/ *").tokens()),
+            "/ *",
+        );
+        // for cases like: let x = x < -z;
+        assert_eq!(
+            BlockUnformatter::<80>.unformat(Tokens::tokenize("< -").tokens()),
+            "< -",
+        );
     }
+
 }

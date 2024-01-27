@@ -1,9 +1,9 @@
-use morpheme::{Morpheme, MorphemeKind};
+use tokenizer::{Morpheme, MorphemeKind};
 
 pub mod visitors;
 
 pub mod formatters;
-pub mod morpheme;
+pub mod tokenizer;
 
 const JUNK: &[&str] = &[
     "",

@@ -1,4 +1,4 @@
-use crate::{append, Unformat, morpheme::Morpheme};
+use crate::{append, Unformat, tokenizer::Morpheme};
 
 pub struct BlockUnformatter<const N: usize>;
 

@@ -1,7 +1,7 @@
 use std::{fs, path::Path};
 
 use anyhow::Context;
-use cargo_unfmt::{formatters::BlockUnformatter, morpheme::Tokenizer, Unformat};
+use cargo_unfmt::{formatters::BlockUnformatter, tokenizer::Tokenizer, Unformat};
 use walkdir::WalkDir;
 
 fn main() -> anyhow::Result<()> {

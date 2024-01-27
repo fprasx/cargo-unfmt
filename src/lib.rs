@@ -1,9 +1,9 @@
 use morpheme::{Morpheme, MorphemeKind};
 
-mod visitors;
+pub mod visitors;
 
-pub mod morpheme;
 pub mod formatters;
+pub mod morpheme;
 
 const JUNK: &[&str] = &[
     "",
@@ -23,17 +23,15 @@ const JUNK: &[&str] = &[
     "while(false){}",
 ];
 
-
 pub trait Unformat<'a> {
     fn unformat(self, tokens: &[Morpheme<'a>]) -> String;
 }
-
 
 fn append(buf: &mut String, last: &Morpheme, token: &Morpheme) -> usize {
     match (last.kind, token.kind) {
         (MorphemeKind::Repel | MorphemeKind::RepelRight, MorphemeKind::Repel) => {
             buf.push_str(&format!(" {}", token.str));
-            1 + token.len()
+            1 + token.str.len()
         }
         (MorphemeKind::Tight, MorphemeKind::Tight) => {
             match (last.str, token.str) {
@@ -53,14 +51,14 @@ fn append(buf: &mut String, last: &Morpheme, token: &Morpheme) -> usize {
                     2
                 }
                 _ => {
-                    buf.push_str(&token.to_string());
-                    token.len()
+                    buf.push_str(token.str);
+                    token.str.len()
                 }
             }
         }
         _ => {
-            buf.push_str(&token.to_string());
-            token.len()
+            buf.push_str(token.str);
+            token.str.len()
         }
     }
 }
@@ -87,5 +85,4 @@ mod test {
         append(&mut buf, &Morpheme::tight("<"), &Morpheme::tight("-"));
         assert_eq!(buf, "< -");
     }
-
 }

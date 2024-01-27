@@ -1,3 +1,4 @@
+use anyhow::Context;
 use rustc_lexer::{Token, TokenKind};
 use std::fmt::Display;
 
@@ -5,6 +6,7 @@ use std::fmt::Display;
 pub enum MorphemeKind {
     Repel,
     RepelRight,
+    RepelLeft,
     Tight,
 }
 
@@ -33,10 +35,6 @@ impl<'a> Morpheme<'a> {
     pub fn tight(str: &'a str) -> Self {
         Morpheme::new(str, MorphemeKind::Tight)
     }
-
-    pub fn len(&self) -> usize {
-        self.str.len()
-    }
 }
 
 impl Display for Morpheme<'_> {
@@ -45,65 +43,82 @@ impl Display for Morpheme<'_> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct Tokens<'a> {
     tokens: Vec<Morpheme<'a>>,
 }
 
 macro_rules! recognize {
-    ($source:ident, $tokens:ident, $token:literal, $tokenfn:ident) => {
+    ($self:ident, $source:ident, $token:literal, $tokenfn:ident) => {
         if let Some(remainder) = $source.strip_prefix($token) {
-            $tokens.push(Morpheme::new($token, MorphemeKind::$tokenfn));
-            $source = remainder;
-            continue;
+            $self
+                .tokens
+                .push(Morpheme::new($token, MorphemeKind::$tokenfn));
+            return Some(remainder);
         }
     };
 }
 
 impl<'a> Tokens<'a> {
+    pub fn new() -> Self {
+        Self { tokens: vec![] }
+    }
+
     pub fn tokens(&self) -> &[Morpheme<'a>] {
         &self.tokens
     }
 
-    pub fn tokenize(mut source: &'a str) -> Self {
-        let mut tokens = vec![];
+    /// Detects simple tokens such as operators at the beginning of source, returning
+    /// the new source with the token stripped away if successful.
+    fn recognize_simple_token(&mut self, source: &'a str) -> Option<&'a str> {
+        // Order of these matters
+        recognize!(self, source, "..=", Tight);
+        recognize!(self, source, "...", Tight);
+        recognize!(self, source, "..", Tight);
+
+        recognize!(self, source, "::", Tight);
+
+        recognize!(self, source, "->", Tight);
+        recognize!(self, source, "=>", Tight);
+
+        recognize!(self, source, "==", Tight);
+        recognize!(self, source, "!=", Tight);
+
+        recognize!(self, source, "<=", Tight);
+        recognize!(self, source, ">=", Tight);
+
+        recognize!(self, source, "&&", Tight);
+        recognize!(self, source, "||", Tight);
+
+        recognize!(self, source, ">>=", Tight);
+        recognize!(self, source, "<<=", Tight);
+        recognize!(self, source, ">>", Tight);
+        recognize!(self, source, "<<", Tight);
+
+        recognize!(self, source, "+=", Tight);
+        recognize!(self, source, "-=", Tight);
+        recognize!(self, source, "*=", Tight);
+        recognize!(self, source, "/=", Tight);
+        recognize!(self, source, "%=", Tight);
+        recognize!(self, source, "^=", Tight);
+        recognize!(self, source, "&=", Tight);
+        recognize!(self, source, "|=", Tight);
+
+        None
+    }
+
+    pub fn tokenize_file(mut source: &'a str) -> anyhow::Result<Self> {
+        let mut tokens = Self::new();
+        let parsed = syn::parse_file(source).context("not valid Rust syntax")?;
+
         while !source.is_empty() {
-            // Order of these matters
-            recognize!(source, tokens, "..=", Tight);
-            recognize!(source, tokens, "...", Tight);
-            recognize!(source, tokens, "..", Tight);
-
-            recognize!(source, tokens, "::", Tight);
-
-            recognize!(source, tokens, "->", Tight);
-            recognize!(source, tokens, "=>", Tight);
-
-            recognize!(source, tokens, "==", Tight);
-            recognize!(source, tokens, "!=", Tight);
-
-            recognize!(source, tokens, "<=", Tight);
-            recognize!(source, tokens, ">=", Tight);
-
-            recognize!(source, tokens, "&&", Tight);
-            recognize!(source, tokens, "||", Tight);
-
-            recognize!(source, tokens, ">>=", Tight);
-            recognize!(source, tokens, "<<=", Tight);
-            recognize!(source, tokens, ">>", Tight);
-            recognize!(source, tokens, "<<", Tight);
-
-            recognize!(source, tokens, "+=", Tight);
-            recognize!(source, tokens, "-=", Tight);
-            recognize!(source, tokens, "*=", Tight);
-            recognize!(source, tokens, "/=", Tight);
-            recognize!(source, tokens, "%=", Tight);
-            recognize!(source, tokens, "^=", Tight);
-            recognize!(source, tokens, "&=", Tight);
-            recognize!(source, tokens, "|=", Tight);
-
             let Token { kind, len } = rustc_lexer::first_token(source);
             let (str, remainder) = source.split_at(len);
             source = remainder;
+
+            if let Some(remainder) = tokens.recognize_simple_token(source) {
+                source = remainder;
+            }
 
             let mtype = match kind {
                 TokenKind::Ident => MorphemeKind::Repel,
@@ -124,9 +139,9 @@ impl<'a> Tokens<'a> {
                 TokenKind::Colon => MorphemeKind::Tight,
                 _ => MorphemeKind::Tight,
             };
-            tokens.push(Morpheme::new(str, mtype));
+            tokens.tokens.push(Morpheme::new(str, mtype));
         }
-        Self { tokens }
+        Ok(tokens)
     }
 }
 
@@ -137,12 +152,12 @@ mod tests {
     #[test]
     fn idents_separated() {
         assert_eq!(
-            Tokens::tokenize("use it fn"),
+            Tokens::tokenize_file("use it;").unwrap(),
             Tokens {
                 tokens: vec![
                     Morpheme::repel("use"),
                     Morpheme::repel("it"),
-                    Morpheme::repel("fn"),
+                    Morpheme::tight(";"),
                 ],
             }
         )
@@ -151,9 +166,17 @@ mod tests {
     #[test]
     fn lifetime_repels_ident() {
         assert_eq!(
-            Tokens::tokenize("'a ident"),
+            Tokens::tokenize_file("type x = &'a ident;").unwrap(),
             Tokens {
-                tokens: vec![Morpheme::repel_right("'a"), Morpheme::repel("ident")]
+                tokens: vec![
+                    Morpheme::repel("type"),
+                    Morpheme::repel("x"),
+                    Morpheme::tight("="),
+                    Morpheme::tight("&"),
+                    Morpheme::repel_right("'a"), // the important ones
+                    Morpheme::repel("ident"),    //
+                    Morpheme::tight(";"),
+                ]
             }
         )
     }

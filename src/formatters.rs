@@ -9,7 +9,7 @@ impl<'a, const N: usize> Unformat<'a> for BlockUnformatter<N> {
             return String::new();
         };
 
-        let mut char = last.len();
+        let mut char = last.str.len();
         let mut buf = last.to_string();
 
         for token in tokens {
@@ -17,8 +17,8 @@ impl<'a, const N: usize> Unformat<'a> for BlockUnformatter<N> {
                 char = 0;
                 buf.push('\n');
                 char += append(&mut buf, last, token);
-            } else if char + token.len() > N {
-                if char + token.len() - N < N - char {
+            } else if char + token.str.len() > N {
+                if char + token.str.len() - N < N - char {
                     append(&mut buf, last, token);
                     buf.push('\n');
                     char = 0;

@@ -1,6 +1,11 @@
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use rustc_lexer::{Token, TokenKind};
 use std::fmt::Display;
+
+/// The default display for syn errors is extremely minimal.
+pub fn display_syn_error(e: syn::Error) -> String {
+    format!("error @ {:?}: {e}", e.span().start())
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum MorphemeKind {
@@ -107,20 +112,20 @@ impl<'a> Tokenizer<'a> {
         None
     }
 
-    pub fn tokenize_file(mut source: &'a str) -> anyhow::Result<Self> {
+    pub fn tokenize_file(mut source: &'a str) -> anyhow::Result<Vec<Morpheme>> {
         let mut tokenizer = Self::new();
-        let parsed = syn::parse_file(source).context("not valid Rust syntax")?;
+        let parsed = syn::parse_file(source).map_err(|e| anyhow!(display_syn_error(e))).context("not valid Rust syntax")?;
 
         while !source.is_empty() {
-            let Token { kind, len } = rustc_lexer::first_token(source);
-            let (str, remainder) = source.split_at(len);
-            source = remainder;
-
             // rustc_lexer's tokens are very granular, as in two &'s instead of
             // an &&, so we recognize multicharacter tokens like operators manually.
             if let Some(remainder) = tokenizer.recognize_multichar_token(source) {
                 source = remainder;
             }
+
+            let Token { kind, len } = rustc_lexer::first_token(source);
+            let (str, remainder) = source.split_at(len);
+            source = remainder;
 
             let mtype = match kind {
                 TokenKind::Ident => MorphemeKind::Repel,
@@ -143,7 +148,7 @@ impl<'a> Tokenizer<'a> {
             };
             tokenizer.tokens.push(Morpheme::new(str, mtype));
         }
-        Ok(tokenizer)
+        Ok(tokenizer.tokens)
     }
 }
 
@@ -155,13 +160,11 @@ mod tests {
     fn idents_separated() {
         assert_eq!(
             Tokenizer::tokenize_file("use it;").unwrap(),
-            Tokenizer {
-                tokens: vec![
-                    Morpheme::repel("use"),
-                    Morpheme::repel("it"),
-                    Morpheme::tight(";"),
-                ],
-            }
+            vec![
+                Morpheme::repel("use"),
+                Morpheme::repel("it"),
+                Morpheme::tight(";"),
+            ],
         )
     }
 
@@ -169,17 +172,15 @@ mod tests {
     fn lifetime_repels_ident() {
         assert_eq!(
             Tokenizer::tokenize_file("type x = &'a ident;").unwrap(),
-            Tokenizer {
-                tokens: vec![
-                    Morpheme::repel("type"),
-                    Morpheme::repel("x"),
-                    Morpheme::tight("="),
-                    Morpheme::tight("&"),
-                    Morpheme::repel_right("'a"), // the important ones
-                    Morpheme::repel("ident"),    //
-                    Morpheme::tight(";"),
-                ]
-            }
+            vec![
+                Morpheme::repel("type"),
+                Morpheme::repel("x"),
+                Morpheme::tight("="),
+                Morpheme::tight("&"),
+                Morpheme::repel_right("'a"), // the important ones
+                Morpheme::repel("ident"),    //
+                Morpheme::tight(";"),
+            ]
         )
     }
 }

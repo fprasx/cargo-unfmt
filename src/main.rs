@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use anyhow::Context;
 use cargo_unfmt::{
-    formatters::BlockUnformatter, morpheme::Tokens, visitors::MacroVisitor, Unformat,
+    formatters::BlockUnformatter, morpheme::Tokenizer, visitors::MacroVisitor, Unformat,
 };
 use syn::{visit::Visit};
 use walkdir::WalkDir;
@@ -37,7 +37,7 @@ fn unfmt() -> anyhow::Result<()> {
             let src =
                 String::from_utf8(fs::read(file.path()).context("failed to read source file")?)
                     .context("file was not utf-8")?;
-            let formatted = BlockUnformatter::<80>.unformat(Tokens::tokenize_file(&src)?.tokens());
+            let formatted = BlockUnformatter::<80>.unformat(Tokenizer::tokenize_file(&src)?.tokens());
             fs::write(&path, &formatted).context("failed to write formatted source over")?;
         } else {
             fs::copy(file.path(), &path).context("failed to copy file over")?;

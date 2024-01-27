@@ -44,7 +44,7 @@ impl Display for Morpheme<'_> {
 }
 
 #[derive(Debug, PartialEq, Eq, Default)]
-pub struct Tokens<'a> {
+pub struct Tokenizer<'a> {
     tokens: Vec<Morpheme<'a>>,
 }
 
@@ -59,7 +59,7 @@ macro_rules! recognize {
     };
 }
 
-impl<'a> Tokens<'a> {
+impl<'a> Tokenizer<'a> {
     pub fn new() -> Self {
         Self { tokens: vec![] }
     }
@@ -108,7 +108,7 @@ impl<'a> Tokens<'a> {
     }
 
     pub fn tokenize_file(mut source: &'a str) -> anyhow::Result<Self> {
-        let mut tokens = Self::new();
+        let mut tokenizer = Self::new();
         let parsed = syn::parse_file(source).context("not valid Rust syntax")?;
 
         while !source.is_empty() {
@@ -116,7 +116,7 @@ impl<'a> Tokens<'a> {
             let (str, remainder) = source.split_at(len);
             source = remainder;
 
-            if let Some(remainder) = tokens.recognize_simple_token(source) {
+            if let Some(remainder) = tokenizer.recognize_simple_token(source) {
                 source = remainder;
             }
 
@@ -139,9 +139,9 @@ impl<'a> Tokens<'a> {
                 TokenKind::Colon => MorphemeKind::Tight,
                 _ => MorphemeKind::Tight,
             };
-            tokens.tokens.push(Morpheme::new(str, mtype));
+            tokenizer.tokens.push(Morpheme::new(str, mtype));
         }
-        Ok(tokens)
+        Ok(tokenizer)
     }
 }
 
@@ -152,8 +152,8 @@ mod tests {
     #[test]
     fn idents_separated() {
         assert_eq!(
-            Tokens::tokenize_file("use it;").unwrap(),
-            Tokens {
+            Tokenizer::tokenize_file("use it;").unwrap(),
+            Tokenizer {
                 tokens: vec![
                     Morpheme::repel("use"),
                     Morpheme::repel("it"),
@@ -166,8 +166,8 @@ mod tests {
     #[test]
     fn lifetime_repels_ident() {
         assert_eq!(
-            Tokens::tokenize_file("type x = &'a ident;").unwrap(),
-            Tokens {
+            Tokenizer::tokenize_file("type x = &'a ident;").unwrap(),
+            Tokenizer {
                 tokens: vec![
                     Morpheme::repel("type"),
                     Morpheme::repel("x"),

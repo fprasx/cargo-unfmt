@@ -5,12 +5,6 @@ use cargo_unfmt::{BlockUnformatter, Tokens, Unformat};
 use walkdir::WalkDir;
 
 fn main() -> anyhow::Result<()> {
-    let src = include_str!("../long-rust-file.rs");
-    let tokens = Tokens::tokenize(src);
-
-    let formatted = tokens.format();
-    fs::write("formatted.rs", formatted).context("failed to write to file")?;
-
     unfmt()
 }
 

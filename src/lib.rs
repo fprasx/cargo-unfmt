@@ -6,7 +6,6 @@ use rustc_lexer::{Token, TokenKind};
 pub enum Morpheme<'a> {
     Repel(&'a str),
     RepelRight(&'a str),
-    RepelColon(&'a str),
     Tight(&'a str),
 }
 
@@ -16,7 +15,6 @@ impl Morpheme<'_> {
             Morpheme::Repel(s) => s,
             Morpheme::Tight(s) => s,
             Morpheme::RepelRight(s) => s,
-            Morpheme::RepelColon(s) => s,
         };
         str.len()
     }
@@ -28,7 +26,6 @@ impl Display for Morpheme<'_> {
             Morpheme::Repel(s) => s,
             Morpheme::Tight(s) => s,
             Morpheme::RepelRight(s) => s,
-            Morpheme::RepelColon(s) => s,
         };
         write!(f, "{str}")
     }
@@ -61,7 +58,7 @@ impl<'a> Tokens<'a> {
             recognize!(source, tokens, "...", Tight);
             recognize!(source, tokens, "..", Tight);
 
-            recognize!(source, tokens, "::", RepelColon);
+            recognize!(source, tokens, "::", Tight);
 
             recognize!(source, tokens, "->", Tight);
             recognize!(source, tokens, "=>", Tight);
@@ -109,7 +106,7 @@ impl<'a> Tokens<'a> {
                 TokenKind::Whitespace | TokenKind::LineComment | TokenKind::BlockComment { .. } => {
                     continue;
                 }
-                TokenKind::Colon => Morpheme::RepelColon,
+                TokenKind::Colon => Morpheme::Tight,
                 _ => Morpheme::Tight,
             };
             tokens.push(mtype(str));
@@ -117,29 +114,6 @@ impl<'a> Tokens<'a> {
         Self { tokens }
     }
 
-    pub fn format(&self) -> String {
-        let mut buf = String::new();
-        let mut tokens = self.tokens.iter();
-        let Some(mut last) = tokens.next() else {
-            return buf;
-        };
-        buf.push_str(&last.to_string());
-
-        for token in tokens {
-            match (last, token) {
-                (Morpheme::Repel(_) | Morpheme::RepelRight(_), Morpheme::Repel(t)) => {
-                    buf.push_str(&format!(" {t}"))
-                }
-                (Morpheme::RepelColon(_), Morpheme::RepelColon(t)) => {
-                    buf.push_str(&format!(" {t}"))
-                }
-                _ => buf.push_str(&token.to_string()),
-            }
-            last = token;
-        }
-
-        buf
-    }
 }
 
 pub trait Unformat<'a> {
@@ -154,9 +128,20 @@ fn append(buf: &mut String, last: &Morpheme, token: &Morpheme) -> usize {
             buf.push_str(&format!(" {t}"));
             1 + token.len()
         }
-        (Morpheme::RepelColon(_), Morpheme::RepelColon(t)) => {
-            buf.push_str(&format!(" {t}"));
-            1 + token.len()
+        // let x: ::std... should not become let x:::std....
+        (Morpheme::Tight(":"), Morpheme::Tight("::")) => {
+            buf.push_str(&format!(" ::"));
+            3
+        }
+        // / and * fuse to become /*, the start of a comment
+        (Morpheme::Tight("/"), Morpheme::Tight("*")) => {
+            buf.push_str(" *");
+            2
+        }
+        // For some reason it doesn't like <-, so < -1 needs can't become <-1
+        (Morpheme::Tight("<"), Morpheme::Tight("-")) => {
+            buf.push_str(" -");
+            2
         }
         _ => {
             buf.push_str(&token.to_string());

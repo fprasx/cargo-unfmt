@@ -1,5 +1,5 @@
 use anyhow::{Context, anyhow};
-use rustc_lexer::{Token, TokenKind};
+use rustc_lexer::{Token, TokenKind, LiteralKind};
 use std::fmt::Display;
 
 /// The default display for syn errors is extremely minimal.
@@ -131,14 +131,14 @@ impl<'a> Tokenizer<'a> {
                 TokenKind::Ident => MorphemeKind::Repel,
                 TokenKind::Lifetime { .. } => MorphemeKind::RepelRight,
                 TokenKind::Literal { kind, .. } => match kind {
-                    rustc_lexer::LiteralKind::Int { .. } => MorphemeKind::Repel,
-                    rustc_lexer::LiteralKind::Float { .. } => MorphemeKind::Repel,
-                    rustc_lexer::LiteralKind::Char { .. } => MorphemeKind::Repel,
-                    rustc_lexer::LiteralKind::Byte { .. } => MorphemeKind::Repel,
-                    rustc_lexer::LiteralKind::Str { .. } => MorphemeKind::Repel,
-                    rustc_lexer::LiteralKind::ByteStr { .. } => MorphemeKind::Repel,
-                    rustc_lexer::LiteralKind::RawStr { .. } => MorphemeKind::Repel,
-                    rustc_lexer::LiteralKind::RawByteStr { .. } => MorphemeKind::Repel,
+                    LiteralKind::Int { .. } => MorphemeKind::Repel,
+                    LiteralKind::Float { .. } => MorphemeKind::Repel,
+                    LiteralKind::Char { .. } => MorphemeKind::Repel,
+                    LiteralKind::Byte { .. } => MorphemeKind::Repel,
+                    LiteralKind::Str { .. } => MorphemeKind::Repel,
+                    LiteralKind::ByteStr { .. } => MorphemeKind::Repel,
+                    LiteralKind::RawStr { .. } => MorphemeKind::Repel,
+                    LiteralKind::RawByteStr { .. } => MorphemeKind::Repel,
                 },
                 TokenKind::Whitespace | TokenKind::LineComment | TokenKind::BlockComment { .. } => {
                     continue;

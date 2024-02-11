@@ -72,17 +72,29 @@ mod test {
     fn repel_special_cases() {
         // for cases like let x: ::std::usize ...
         let mut buf = String::from(":");
-        append(&mut buf, &Morpheme::tight(":"), &Morpheme::tight("::"));
+        append(
+            &mut buf,
+            &Morpheme::tight(":", 0, 0),
+            &Morpheme::tight("::", 0, 0),
+        );
         assert_eq!(buf, ": ::");
 
         // for cases like: let x = y / *z;
         let mut buf = String::from("/");
-        append(&mut buf, &Morpheme::tight("/"), &Morpheme::tight("*"));
+        append(
+            &mut buf,
+            &Morpheme::tight("/", 0, 0),
+            &Morpheme::tight("*", 0, 0),
+        );
         assert_eq!(buf, "/ *");
 
         // for cases like: let x = x < -z;
         let mut buf = String::from("<");
-        append(&mut buf, &Morpheme::tight("<"), &Morpheme::tight("-"));
+        append(
+            &mut buf,
+            &Morpheme::tight("<", 0, 0),
+            &Morpheme::tight("-", 0, 0),
+        );
         assert_eq!(buf, "< -");
     }
 }

@@ -1,14 +1,23 @@
 use std::{fs, path::Path};
 
 use anyhow::Context;
-use cargo_unfmt::{formatters::BlockUnformatter, tokenizer::Tokenizer, Unformat};
+use cargo_unfmt::{
+    formatters::BlockUnformatter,
+    tokenizer::{self},
+    Unformat,
+};
 use walkdir::WalkDir;
 
 fn main() -> anyhow::Result<()> {
-    test_rustfmt()
+    let src = include_str!("../long-rust-file.rs");
+    let formatted = BlockUnformatter::<80>
+        .unformat(&tokenizer::tokenize_file(src).context("faile to tokenize")?);
+    println!("{formatted}");
+    Ok(())
+    // test_rustfmt()?;
 }
 
-fn test_rustfmt() -> anyhow::Result<()> {
+pub fn test_rustfmt() -> anyhow::Result<()> {
     let input = Path::new("/Users/fpx/code/rust/cargo-unfmt/test_crates/input/");
     let output = Path::new("/Users/fpx/code/rust/cargo-unfmt/test_crates/output/");
     fs::create_dir_all(output).context("failed to create output directory")?;
@@ -16,8 +25,7 @@ fn test_rustfmt() -> anyhow::Result<()> {
     for file in WalkDir::new(input) {
         let file = file.context("failed to walkdir file")?;
         let path_str = file.path().to_str().unwrap();
-        if file.file_type().is_dir() || path_str.contains(".git") || path_str.contains("tests")
-            {
+        if file.file_type().is_dir() || path_str.contains(".git") || path_str.contains("tests") {
             continue;
         }
 
@@ -32,7 +40,7 @@ fn test_rustfmt() -> anyhow::Result<()> {
                 String::from_utf8(fs::read(file.path()).context("failed to read source file")?)
                     .context("file was not utf-8")?;
             let formatted = BlockUnformatter::<80>.unformat(
-                &Tokenizer::tokenize_file(&src)
+                &tokenizer::tokenize_file(&src)
                     .with_context(|| format!("failed to parse: {:?}", file.path()))?,
             );
             fs::write(&path, &formatted).context("failed to write formatted source over")?;

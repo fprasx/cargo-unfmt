@@ -9,12 +9,12 @@ use cargo_unfmt::{
 use walkdir::WalkDir;
 
 fn main() -> anyhow::Result<()> {
-    let src = include_str!("../long-rust-file.rs");
-    let formatted = BlockUnformatter::<80>
-        .unformat(&tokenizer::tokenize_file(src).context("faile to tokenize")?);
-    println!("{formatted}");
-    Ok(())
-    // test_rustfmt()?;
+    // let src = include_str!("../long-rust-file.rs");
+    // let formatted = BlockUnformatter::<80>
+    //     .unformat(&tokenizer::tokenize_file(src).context("faile to tokenize")?);
+    // println!("{formatted}");
+    // Ok(())
+    test_rustfmt()
 }
 
 pub fn test_rustfmt() -> anyhow::Result<()> {

@@ -1,9 +1,9 @@
-use crate::{append, tokenizer::Morpheme, Unformat};
+use crate::{append, tokenizer::Token, Unformat};
 
 pub struct BlockUnformatter<const N: usize>;
 
 impl<'a, const N: usize> Unformat<'a> for BlockUnformatter<N> {
-    fn unformat(self, tokens: &[Morpheme<'a>]) -> String {
+    fn unformat(self, tokens: &[Token<'a>]) -> String {
         let mut tokens = tokens.iter();
         let Some(mut last) = tokens.next() else {
             return String::new();

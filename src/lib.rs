@@ -1,4 +1,4 @@
-use tokenizer::{Morpheme, MorphemeKind};
+use tokenizer::{Token, Affinity};
 
 pub mod visitors;
 
@@ -24,16 +24,20 @@ const JUNK: &[&str] = &[
 ];
 
 pub trait Unformat<'a> {
-    fn unformat(self, tokens: &[Morpheme<'a>]) -> String;
+    fn unformat(self, tokens: &[Token<'a>]) -> String;
 }
 
-fn append(buf: &mut String, last: &Morpheme, token: &Morpheme) -> usize {
+pub trait Nature {
+    fn affinity(&self) -> Affinity;
+}
+
+fn append(buf: &mut String, last: &Token, token: &Token) -> usize {
     match (last.kind, token.kind) {
-        (MorphemeKind::Repel | MorphemeKind::RepelRight, MorphemeKind::Repel) => {
+        (Affinity::Repel | Affinity::RepelRight, Affinity::Repel) => {
             buf.push_str(&format!(" {}", token.str));
             1 + token.str.len()
         }
-        (MorphemeKind::Tight, MorphemeKind::Tight) => {
+        (Affinity::Tight, Affinity::Tight) => {
             match (last.str, token.str) {
                 // let x: ::std... should not become let x:::std....
                 (":", "::") => {
@@ -71,7 +75,7 @@ fn append(buf: &mut String, last: &Morpheme, token: &Morpheme) -> usize {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Morpheme;
+    use crate::Token;
 
     #[test]
     fn repel_special_cases() {
@@ -79,8 +83,8 @@ mod test {
         let mut buf = String::from(":");
         append(
             &mut buf,
-            &Morpheme::tight(":", 0, 0),
-            &Morpheme::tight("::", 0, 0),
+            &Token::tight(":", 0, 0),
+            &Token::tight("::", 0, 0),
         );
         assert_eq!(buf, ": ::");
 
@@ -88,8 +92,8 @@ mod test {
         let mut buf = String::from("/");
         append(
             &mut buf,
-            &Morpheme::tight("/", 0, 0),
-            &Morpheme::tight("*", 0, 0),
+            &Token::tight("/", 0, 0),
+            &Token::tight("*", 0, 0),
         );
         assert_eq!(buf, "/ *");
 
@@ -97,8 +101,8 @@ mod test {
         let mut buf = String::from("<");
         append(
             &mut buf,
-            &Morpheme::tight("<", 0, 0),
-            &Morpheme::tight("-", 0, 0),
+            &Token::tight("<", 0, 0),
+            &Token::tight("-", 0, 0),
         );
         assert_eq!(buf, "< -");
     }

@@ -1,17 +1,17 @@
 use anyhow::{anyhow, Context};
-use rustc_lexer::{Token, TokenKind};
+use rustc_lexer::TokenKind;
 use std::fmt::Display;
 use syn::visit::Visit;
 
 use crate::visitors::MacroVisitor;
 
-/// The default display for syn errors is extremely minimal.
+// The default display for syn errors is extremely minimal.
 pub fn display_syn_error(e: syn::Error) -> String {
     format!("error @ {:?}: {e}", e.span().start())
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum MorphemeKind {
+pub enum Affinity {
     Repel,
     RepelRight,
     RepelLeft,
@@ -20,15 +20,15 @@ pub enum MorphemeKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct Morpheme<'a> {
+pub struct Token<'a> {
     pub str: &'a str,
-    pub kind: MorphemeKind,
+    pub kind: Affinity,
     pub line: usize,
     pub char: usize,
 }
 
-impl<'a> Morpheme<'a> {
-    pub fn new(str: &'a str, kind: MorphemeKind, line: usize, char: usize) -> Self {
+impl<'a> Token<'a> {
+    pub fn new(str: &'a str, kind: Affinity, line: usize, char: usize) -> Self {
         Self {
             str,
             kind,
@@ -38,7 +38,7 @@ impl<'a> Morpheme<'a> {
     }
 }
 
-impl Display for Morpheme<'_> {
+impl Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.str)
     }
@@ -53,7 +53,7 @@ pub struct Tokenizer {
 macro_rules! recognize {
     ($self:ident, $source:ident, $token:literal, $tokenfn:ident) => {
         if let Some(remainder) = $source.strip_prefix($token) {
-            let token = Morpheme::new($token, MorphemeKind::$tokenfn, $self.line, $self.char);
+            let token = Token::new($token, Affinity::$tokenfn, $self.line, $self.char);
             $self.char += $token.len();
             return Some((token, remainder));
         }
@@ -70,7 +70,7 @@ impl Tokenizer {
     fn recognize_multichar_token<'src>(
         &mut self,
         source: &'src str,
-    ) -> Option<(Morpheme<'src>, &'src str)> {
+    ) -> Option<(Token<'src>, &'src str)> {
         // Order of these matters
         recognize!(self, source, "..=", Tight);
         recognize!(self, source, "...", Tight);
@@ -110,22 +110,22 @@ impl Tokenizer {
     /// Returns `None` if the next token is whitespace or a comment.
     ///
     /// **Note**: `src` must not be empty.
-    pub fn recognize_token<'src>(&mut self, src: &'src str) -> (Option<Morpheme<'src>>, &'src str) {
+    pub fn recognize_token<'src>(&mut self, src: &'src str) -> (Option<Token<'src>>, &'src str) {
         debug_assert!(!src.is_empty());
 
-        let Token { kind, len } = rustc_lexer::first_token(src);
+        let rustc_lexer::Token { kind, len } = rustc_lexer::first_token(src);
         let (token, rest) = src.split_at(len);
 
         let mtype = match kind {
-            TokenKind::Ident => Some(MorphemeKind::Repel),
-            TokenKind::Lifetime { .. } => Some(MorphemeKind::RepelRight),
-            TokenKind::Literal { .. } => Some(MorphemeKind::Repel),
+            TokenKind::Ident => Some(Affinity::Repel),
+            TokenKind::Lifetime { .. } => Some(Affinity::Repel),
+            TokenKind::Literal { .. } => Some(Affinity::Repel),
             TokenKind::Whitespace | TokenKind::LineComment | TokenKind::BlockComment { .. } => None,
-            TokenKind::Colon => Some(MorphemeKind::Tight),
-            _ => Some(MorphemeKind::Tight),
+            TokenKind::Colon => Some(Affinity::Tight),
+            _ => Some(Affinity::Tight),
         };
 
-        let morpheme = mtype.map(|mtype| Morpheme::new(token, mtype, self.line, self.char));
+        let morpheme = mtype.map(|mtype| Token::new(token, mtype, self.line, self.char));
 
         let lines = token.split('\n').collect::<Vec<_>>();
         let count = lines.len();
@@ -144,7 +144,7 @@ impl Tokenizer {
     }
 }
 
-pub fn tokenize_file(mut source: &str) -> anyhow::Result<Vec<Morpheme<'_>>> {
+pub fn tokenize_file(mut source: &str) -> anyhow::Result<Vec<Token<'_>>> {
     let mut tokenizer = Tokenizer::new();
 
     let parsed = syn::parse_file(source)
@@ -175,20 +175,20 @@ pub fn tokenize_file(mut source: &str) -> anyhow::Result<Vec<Morpheme<'_>>> {
 mod tests {
     use super::*;
 
-    impl<'a> Morpheme<'a> {
+    impl<'a> Token<'a> {
         #[cfg(test)]
         pub fn repel(str: &'a str, line: usize, char: usize) -> Self {
-            Morpheme::new(str, MorphemeKind::Repel, line, char)
+            Token::new(str, Affinity::Repel, line, char)
         }
 
         #[cfg(test)]
         pub fn repel_right(str: &'a str, line: usize, char: usize) -> Self {
-            Morpheme::new(str, MorphemeKind::RepelRight, line, char)
+            Token::new(str, Affinity::RepelRight, line, char)
         }
 
         #[cfg(test)]
         pub fn tight(str: &'a str, line: usize, char: usize) -> Self {
-            Morpheme::new(str, MorphemeKind::Tight, line, char)
+            Token::new(str, Affinity::Tight, line, char)
         }
     }
 
@@ -197,9 +197,9 @@ mod tests {
         assert_eq!(
             tokenize_file("use it;").unwrap(),
             vec![
-                Morpheme::repel("use", 1, 1),
-                Morpheme::repel("it", 1, 5),
-                Morpheme::tight(";", 1, 7),
+                Token::repel("use", 1, 1),
+                Token::repel("it", 1, 5),
+                Token::tight(";", 1, 7),
             ],
         )
     }
@@ -209,13 +209,13 @@ mod tests {
         assert_eq!(
             tokenize_file("type x = &'a ident;").unwrap(),
             vec![
-                Morpheme::repel("type", 1, 1),
-                Morpheme::repel("x", 1, 6),
-                Morpheme::tight("=", 1, 8),
-                Morpheme::tight("&", 1, 10),
-                Morpheme::repel_right("'a", 1, 11), // the important ones
-                Morpheme::repel("ident", 1, 14),    //
-                Morpheme::tight(";", 1, 19),
+                Token::repel("type", 1, 1),
+                Token::repel("x", 1, 6),
+                Token::tight("=", 1, 8),
+                Token::tight("&", 1, 10),
+                Token::repel_right("'a", 1, 11), // the important ones
+                Token::repel("ident", 1, 14),    //
+                Token::tight(";", 1, 19),
             ]
         )
     }

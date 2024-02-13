@@ -50,6 +50,11 @@ fn append(buf: &mut String, last: &Morpheme, token: &Morpheme) -> usize {
                     buf.push_str(" -");
                     2
                 }
+                // .. and => combine to form ..=> which is parsed as an inclusive range
+                ("..", "=>") => {
+                    buf.push_str(" =>");
+                    3
+                }
                 _ => {
                     buf.push_str(token.str);
                     token.str.len()

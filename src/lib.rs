@@ -1,4 +1,4 @@
-use tokenizer::{Token, Affinity};
+use tokenizer::{Affinity, Token, Token2};
 
 pub mod visitors;
 
@@ -24,50 +24,62 @@ const JUNK: &[&str] = &[
 ];
 
 pub trait Unformat<'a> {
-    fn unformat(self, tokens: &[Token<'a>]) -> String;
+    fn unformat(self, tokens: &[Token2<'a>]) -> String;
 }
 
 pub trait Nature {
     fn affinity(&self) -> Affinity;
 }
 
-fn append(buf: &mut String, last: &Token, token: &Token) -> usize {
-    match (last.kind, token.kind) {
-        (Affinity::Repel | Affinity::RepelRight, Affinity::Repel) => {
-            buf.push_str(&format!(" {}", token.str));
-            1 + token.str.len()
+fn append(buf: &mut String, last: &Token2, token: &Token2) -> usize {
+    match (last.affinity(), token.affinity()) {
+        (Affinity::Repel, Affinity::Repel) => {
+            buf.push(' ');
+            let str = token.as_str();
+            buf.push_str(str);
+            1 + str.len()
         }
         (Affinity::Tight, Affinity::Tight) => {
-            match (last.str, token.str) {
+            match (last, token) {
                 // let x: ::std... should not become let x:::std....
-                (":", "::") => {
-                    buf.push_str(" ::");
-                    3
+                (Token2::Colon, Token2::PathSeparator) => {
+                    buf.push(' ');
+                    let str = token.as_str();
+                    buf.push_str(str);
+                    1 + str.len()
                 }
                 // / and * fuse to become /*, the start of a comment
-                ("/", "*") => {
-                    buf.push_str(" *");
-                    2
+                (Token2::Slash, Token2::Star) => {
+                    buf.push(' ');
+                    let str = token.as_str();
+                    buf.push_str(str);
+                    1 + str.len()
                 }
                 // For some reason it doesn't like <-, so < -1 needs can't become <-1
-                ("<", "-") => {
-                    buf.push_str(" -");
-                    2
+                (Token2::LessThan, Token2::Minus) => {
+                    buf.push(' ');
+                    let str = token.as_str();
+                    buf.push_str(str);
+                    1 + str.len()
                 }
                 // .. and => combine to form ..=> which is parsed as an inclusive range
-                ("..", "=>") => {
-                    buf.push_str(" =>");
-                    3
+                (Token2::Range, Token2::FatArrow) => {
+                    buf.push(' ');
+                    let str = token.as_str();
+                    buf.push_str(str);
+                    1 + str.len()
                 }
                 _ => {
-                    buf.push_str(token.str);
-                    token.str.len()
+                    let str = token.as_str();
+                    buf.push_str(str);
+                    str.len()
                 }
             }
         }
         _ => {
-            buf.push_str(token.str);
-            token.str.len()
+            let str = token.as_str();
+            buf.push_str(str);
+            str.len()
         }
     }
 }
@@ -75,7 +87,6 @@ fn append(buf: &mut String, last: &Token, token: &Token) -> usize {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Token;
 
     #[test]
     fn repel_special_cases() {
@@ -83,27 +94,23 @@ mod test {
         let mut buf = String::from(":");
         append(
             &mut buf,
-            &Token::tight(":", 0, 0),
-            &Token::tight("::", 0, 0),
+            &Token2::Colon,
+            &Token2::PathSeparator
         );
         assert_eq!(buf, ": ::");
 
         // for cases like: let x = y / *z;
         let mut buf = String::from("/");
-        append(
-            &mut buf,
-            &Token::tight("/", 0, 0),
-            &Token::tight("*", 0, 0),
-        );
+        append(&mut buf, &Token2::Slash, &Token2::Star);
         assert_eq!(buf, "/ *");
 
         // for cases like: let x = x < -z;
         let mut buf = String::from("<");
-        append(
-            &mut buf,
-            &Token::tight("<", 0, 0),
-            &Token::tight("-", 0, 0),
-        );
+        append(&mut buf, &Token2::LessThan, &Token2::Minus);
         assert_eq!(buf, "< -");
+
+        let mut buf = String::from("..");
+        append(&mut buf, &Token2::Range, &Token2::FatArrow);
+        assert_eq!(buf, ".. =>");
     }
 }

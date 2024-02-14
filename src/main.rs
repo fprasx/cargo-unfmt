@@ -9,10 +9,14 @@ use cargo_unfmt::{
 use walkdir::WalkDir;
 
 fn main() -> anyhow::Result<()> {
-    // let src = include_str!("../long-rust-file.rs");
-    // let formatted = BlockUnformatter::<80>
-    //     .unformat(&tokenizer::tokenize_file(src).context("faile to tokenize")?);
-    // println!("{formatted}");
+    // let src = include_str!("../typenum.rs");
+    // let formatted = BlockUnformatter::<80>.unformat(
+    //     &tokenizer::tokenize_file(src)
+    //         .context("faile to tokenize")?
+    //         .into_iter()
+    //         .map(|token| token.inner)
+    //         .collect::<Vec<_>>(),
+    // );
     // Ok(())
     test_rustfmt()
 }
@@ -41,7 +45,10 @@ pub fn test_rustfmt() -> anyhow::Result<()> {
                     .context("file was not utf-8")?;
             let formatted = BlockUnformatter::<80>.unformat(
                 &tokenizer::tokenize_file(&src)
-                    .with_context(|| format!("failed to parse: {:?}", file.path()))?,
+                    .with_context(|| format!("failed to parse: {:?}", file.path()))?
+                    .into_iter()
+                    .map(|token| token.inner)
+                    .collect::<Vec<_>>(),
             );
             fs::write(&path, &formatted).context("failed to write formatted source over")?;
         } else {

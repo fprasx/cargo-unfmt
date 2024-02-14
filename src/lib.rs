@@ -1,4 +1,4 @@
-use tokenizer::{Affinity, Token, Token2};
+use tokenizer::{Affinity, Token};
 
 pub mod visitors;
 
@@ -24,14 +24,14 @@ const JUNK: &[&str] = &[
 ];
 
 pub trait Unformat<'a> {
-    fn unformat(self, tokens: &[Token2<'a>]) -> String;
+    fn unformat(self, tokens: &[Token<'a>]) -> String;
 }
 
 pub trait Nature {
     fn affinity(&self) -> Affinity;
 }
 
-fn append(buf: &mut String, last: &Token2, token: &Token2) -> usize {
+fn append(buf: &mut String, last: &Token, token: &Token) -> usize {
     match (last.affinity(), token.affinity()) {
         (Affinity::Repel, Affinity::Repel) => {
             buf.push(' ');
@@ -42,28 +42,28 @@ fn append(buf: &mut String, last: &Token2, token: &Token2) -> usize {
         (Affinity::Tight, Affinity::Tight) => {
             match (last, token) {
                 // let x: ::std... should not become let x:::std....
-                (Token2::Colon, Token2::PathSeparator) => {
+                (Token::Colon, Token::PathSeparator) => {
                     buf.push(' ');
                     let str = token.as_str();
                     buf.push_str(str);
                     1 + str.len()
                 }
                 // / and * fuse to become /*, the start of a comment
-                (Token2::Slash, Token2::Star) => {
+                (Token::Slash, Token::Star) => {
                     buf.push(' ');
                     let str = token.as_str();
                     buf.push_str(str);
                     1 + str.len()
                 }
                 // For some reason it doesn't like <-, so < -1 needs can't become <-1
-                (Token2::LessThan, Token2::Minus) => {
+                (Token::LessThan, Token::Minus) => {
                     buf.push(' ');
                     let str = token.as_str();
                     buf.push_str(str);
                     1 + str.len()
                 }
                 // .. and => combine to form ..=> which is parsed as an inclusive range
-                (Token2::Range, Token2::FatArrow) => {
+                (Token::Range, Token::FatArrow) => {
                     buf.push(' ');
                     let str = token.as_str();
                     buf.push_str(str);
@@ -92,25 +92,21 @@ mod test {
     fn repel_special_cases() {
         // for cases like let x: ::std::usize ...
         let mut buf = String::from(":");
-        append(
-            &mut buf,
-            &Token2::Colon,
-            &Token2::PathSeparator
-        );
+        append(&mut buf, &Token::Colon, &Token::PathSeparator);
         assert_eq!(buf, ": ::");
 
         // for cases like: let x = y / *z;
         let mut buf = String::from("/");
-        append(&mut buf, &Token2::Slash, &Token2::Star);
+        append(&mut buf, &Token::Slash, &Token::Star);
         assert_eq!(buf, "/ *");
 
         // for cases like: let x = x < -z;
         let mut buf = String::from("<");
-        append(&mut buf, &Token2::LessThan, &Token2::Minus);
+        append(&mut buf, &Token::LessThan, &Token::Minus);
         assert_eq!(buf, "< -");
 
         let mut buf = String::from("..");
-        append(&mut buf, &Token2::Range, &Token2::FatArrow);
+        append(&mut buf, &Token::Range, &Token::FatArrow);
         assert_eq!(buf, ".. =>");
     }
 }

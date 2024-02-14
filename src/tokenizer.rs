@@ -18,15 +18,19 @@ pub enum Affinity {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct Token<'a> {
-    pub inner: Token2<'a>,
+pub struct Spanned<T> {
+    inner: T,
     pub line: usize,
     pub char: usize,
 }
 
-impl<'a> Token<'a> {
-    pub fn new(inner: Token2<'a>, line: usize, char: usize) -> Self {
+impl<T> Spanned<T> {
+    pub fn new(inner: T, line: usize, char: usize) -> Self {
         Self { inner, line, char }
+    }
+
+    pub fn into_inner(self) -> T {
+        self.inner
     }
 }
 
@@ -40,21 +44,21 @@ macro_rules! recognize {
     ($self:ident, $source:ident, $token:literal, $tokenfn:expr) => {
         if let Some(remainder) = $source.strip_prefix($token) {
             let token = $tokenfn;
-            let token = Token::new(token, $self.line, $self.char);
+            let token = Spanned::new(token, $self.line, $self.char);
             $self.char += $token.len();
             return Some((token, remainder));
         }
     };
 }
 
-impl Display for Token2<'_> {
+impl Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Token2<'a> {
+pub enum Token<'a> {
     // Complex Tokens
     Ident(&'a str),
     Lifetime(&'a str),
@@ -125,125 +129,125 @@ pub enum Token2<'a> {
     Percent,
 }
 
-impl<'a> Token2<'a> {
+impl<'a> Token<'a> {
     pub fn as_str(&self) -> &'a str {
         match self {
-            Token2::Ident(s) => s,
-            Token2::Lifetime(s) => s,
-            Token2::Literal(s) => s,
-            Token2::RawIdent(s) => s,
-            Token2::RangeInclusive => "..=",
-            Token2::VariadicArgs => "...",
-            Token2::Range => "..",
-            Token2::PathSeparator => "::",
-            Token2::ParameterArrow => "->",
-            Token2::FatArrow => "=>",
-            Token2::EqualCheck => "==",
-            Token2::NotEqual => "!=",
-            Token2::LessThanEq => "<=",
-            Token2::GreaterThanEq => ">=",
-            Token2::BooleanAnd => "&&",
-            Token2::BooleanOr => "||",
-            Token2::ShiftRightAssign => ">>=",
-            Token2::ShiftLeftAssign => "<<=",
-            Token2::ShiftRight => ">>",
-            Token2::ShiftLeft => "<<",
-            Token2::AddAssign => "+=",
-            Token2::SubAssign => "-=",
-            Token2::MulAssign => "*=",
-            Token2::DivAssign => "/=",
-            Token2::ModAssign => "%=",
-            Token2::XorAssign => "^=",
-            Token2::AndAssign => "&=",
-            Token2::OrAssign => "|=",
-            Token2::OpenParen => "(",
-            Token2::CloseParen => ")",
-            Token2::OpenBrace => "{",
-            Token2::CloseBrace => "}",
-            Token2::OpenBracket => "[",
-            Token2::CloseBracket => "]",
-            Token2::Colon => ":",
-            Token2::Semi => ";",
-            Token2::Comma => ",",
-            Token2::Dot => ".",
-            Token2::At => "@",
-            Token2::Pound => "#",
-            Token2::Tilde => "~",
-            Token2::Question => "?",
-            Token2::Dollar => "$",
-            Token2::Eq => "=",
-            Token2::Not => "!",
-            Token2::LessThan => "<",
-            Token2::GreatherThan => ">",
-            Token2::Minus => "-",
-            Token2::And => "&",
-            Token2::Or => "|",
-            Token2::Plus => "+",
-            Token2::Star => "*",
-            Token2::Slash => "/",
-            Token2::Caret => "^",
-            Token2::Percent => "%",
+            Token::Ident(s) => s,
+            Token::Lifetime(s) => s,
+            Token::Literal(s) => s,
+            Token::RawIdent(s) => s,
+            Token::RangeInclusive => "..=",
+            Token::VariadicArgs => "...",
+            Token::Range => "..",
+            Token::PathSeparator => "::",
+            Token::ParameterArrow => "->",
+            Token::FatArrow => "=>",
+            Token::EqualCheck => "==",
+            Token::NotEqual => "!=",
+            Token::LessThanEq => "<=",
+            Token::GreaterThanEq => ">=",
+            Token::BooleanAnd => "&&",
+            Token::BooleanOr => "||",
+            Token::ShiftRightAssign => ">>=",
+            Token::ShiftLeftAssign => "<<=",
+            Token::ShiftRight => ">>",
+            Token::ShiftLeft => "<<",
+            Token::AddAssign => "+=",
+            Token::SubAssign => "-=",
+            Token::MulAssign => "*=",
+            Token::DivAssign => "/=",
+            Token::ModAssign => "%=",
+            Token::XorAssign => "^=",
+            Token::AndAssign => "&=",
+            Token::OrAssign => "|=",
+            Token::OpenParen => "(",
+            Token::CloseParen => ")",
+            Token::OpenBrace => "{",
+            Token::CloseBrace => "}",
+            Token::OpenBracket => "[",
+            Token::CloseBracket => "]",
+            Token::Colon => ":",
+            Token::Semi => ";",
+            Token::Comma => ",",
+            Token::Dot => ".",
+            Token::At => "@",
+            Token::Pound => "#",
+            Token::Tilde => "~",
+            Token::Question => "?",
+            Token::Dollar => "$",
+            Token::Eq => "=",
+            Token::Not => "!",
+            Token::LessThan => "<",
+            Token::GreatherThan => ">",
+            Token::Minus => "-",
+            Token::And => "&",
+            Token::Or => "|",
+            Token::Plus => "+",
+            Token::Star => "*",
+            Token::Slash => "/",
+            Token::Caret => "^",
+            Token::Percent => "%",
         }
     }
 }
 
-impl<'a> Nature for Token2<'a> {
+impl<'a> Nature for Token<'a> {
     fn affinity(&self) -> Affinity {
         match self {
-            Token2::Ident(_) | Token2::Lifetime(_) | Token2::Literal(_) | Token2::RawIdent(_) => {
+            Token::Ident(_) | Token::Lifetime(_) | Token::Literal(_) | Token::RawIdent(_) => {
                 Affinity::Repel
             }
-            Token2::RangeInclusive
-            | Token2::VariadicArgs
-            | Token2::Range
-            | Token2::PathSeparator
-            | Token2::ParameterArrow
-            | Token2::FatArrow
-            | Token2::EqualCheck
-            | Token2::NotEqual
-            | Token2::LessThanEq
-            | Token2::GreaterThanEq
-            | Token2::BooleanAnd
-            | Token2::BooleanOr
-            | Token2::ShiftRightAssign
-            | Token2::ShiftLeftAssign
-            | Token2::ShiftRight
-            | Token2::ShiftLeft
-            | Token2::AddAssign
-            | Token2::SubAssign
-            | Token2::MulAssign
-            | Token2::DivAssign
-            | Token2::ModAssign
-            | Token2::XorAssign
-            | Token2::AndAssign
-            | Token2::OrAssign
-            | Token2::OpenParen
-            | Token2::CloseParen
-            | Token2::OpenBrace
-            | Token2::CloseBrace
-            | Token2::OpenBracket
-            | Token2::CloseBracket
-            | Token2::Colon
-            | Token2::Semi
-            | Token2::Comma
-            | Token2::Dot
-            | Token2::At
-            | Token2::Pound
-            | Token2::Tilde
-            | Token2::Question
-            | Token2::Dollar
-            | Token2::Eq
-            | Token2::Not
-            | Token2::LessThan
-            | Token2::GreatherThan
-            | Token2::Minus
-            | Token2::And
-            | Token2::Or
-            | Token2::Plus
-            | Token2::Star
-            | Token2::Slash
-            | Token2::Caret
-            | Token2::Percent => Affinity::Tight,
+            Token::RangeInclusive
+            | Token::VariadicArgs
+            | Token::Range
+            | Token::PathSeparator
+            | Token::ParameterArrow
+            | Token::FatArrow
+            | Token::EqualCheck
+            | Token::NotEqual
+            | Token::LessThanEq
+            | Token::GreaterThanEq
+            | Token::BooleanAnd
+            | Token::BooleanOr
+            | Token::ShiftRightAssign
+            | Token::ShiftLeftAssign
+            | Token::ShiftRight
+            | Token::ShiftLeft
+            | Token::AddAssign
+            | Token::SubAssign
+            | Token::MulAssign
+            | Token::DivAssign
+            | Token::ModAssign
+            | Token::XorAssign
+            | Token::AndAssign
+            | Token::OrAssign
+            | Token::OpenParen
+            | Token::CloseParen
+            | Token::OpenBrace
+            | Token::CloseBrace
+            | Token::OpenBracket
+            | Token::CloseBracket
+            | Token::Colon
+            | Token::Semi
+            | Token::Comma
+            | Token::Dot
+            | Token::At
+            | Token::Pound
+            | Token::Tilde
+            | Token::Question
+            | Token::Dollar
+            | Token::Eq
+            | Token::Not
+            | Token::LessThan
+            | Token::GreatherThan
+            | Token::Minus
+            | Token::And
+            | Token::Or
+            | Token::Plus
+            | Token::Star
+            | Token::Slash
+            | Token::Caret
+            | Token::Percent => Affinity::Tight,
         }
     }
 }
@@ -258,67 +262,67 @@ impl Tokenizer {
     fn recognize_multichar_token<'src>(
         &mut self,
         source: &'src str,
-    ) -> Option<(Token<'src>, &'src str)> {
-        recognize!(self, source, "..=", Token2::RangeInclusive);
-        recognize!(self, source, "...", Token2::VariadicArgs);
-        recognize!(self, source, "..", Token2::Range);
-        // recognize!(self, source, "a",);
-        recognize!(self, source, "::", Token2::PathSeparator);
-        // recognize!(self, source, "a",);
-        recognize!(self, source, "->", Token2::ParameterArrow);
-        recognize!(self, source, "=>", Token2::FatArrow);
-        // recognize!(self, source, "a",);
-        recognize!(self, source, "==", Token2::EqualCheck);
-        recognize!(self, source, "!=", Token2::NotEqual);
-        // recognize!(self, source, "a",);
-        recognize!(self, source, "<=", Token2::LessThanEq);
-        recognize!(self, source, ">=", Token2::GreaterThanEq);
-        // recognize!(self, source, "a",);
-        recognize!(self, source, "&&", Token2::BooleanAnd);
-        recognize!(self, source, "||", Token2::BooleanOr);
-        // recognize!(self, source, "a",);
-        recognize!(self, source, ">>=", Token2::ShiftRightAssign);
-        recognize!(self, source, "<<=", Token2::ShiftLeftAssign);
-        recognize!(self, source, ">>", Token2::ShiftRight);
-        recognize!(self, source, "<<", Token2::ShiftLeft);
-        // recognize!(self, source, "a",);
-        recognize!(self, source, "+=", Token2::AddAssign);
-        recognize!(self, source, "-=", Token2::SubAssign);
-        recognize!(self, source, "*=", Token2::MulAssign);
-        recognize!(self, source, "/=", Token2::DivAssign);
-        recognize!(self, source, "%=", Token2::ModAssign);
-        recognize!(self, source, "^=", Token2::XorAssign);
-        recognize!(self, source, "&=", Token2::AndAssign);
-        recognize!(self, source, "|=", Token2::OrAssign);
-        // recognize!(self, source, "a",);
-        recognize!(self, source, "(", Token2::OpenParen);
-        recognize!(self, source, ")", Token2::CloseParen);
-        recognize!(self, source, "{", Token2::OpenBrace);
-        recognize!(self, source, "}", Token2::CloseBrace);
-        recognize!(self, source, "[", Token2::OpenBracket);
-        recognize!(self, source, "]", Token2::CloseBracket);
-        // recognize!(self, source, "a",);
-        recognize!(self, source, ":", Token2::Colon);
-        recognize!(self, source, ";", Token2::Semi);
-        recognize!(self, source, ",", Token2::Comma);
-        recognize!(self, source, ".", Token2::Dot);
-        recognize!(self, source, "@", Token2::At);
-        recognize!(self, source, "#", Token2::Pound);
-        recognize!(self, source, "~", Token2::Tilde);
-        recognize!(self, source, "?", Token2::Question);
-        recognize!(self, source, "$", Token2::Dollar);
-        recognize!(self, source, "=", Token2::Eq);
-        recognize!(self, source, "!", Token2::Not);
-        recognize!(self, source, "<", Token2::LessThan);
-        recognize!(self, source, ">", Token2::GreatherThan);
-        recognize!(self, source, "-", Token2::Minus);
-        recognize!(self, source, "&", Token2::And);
-        recognize!(self, source, "|", Token2::Or);
-        recognize!(self, source, "+", Token2::Plus);
-        recognize!(self, source, "*", Token2::Star);
-        recognize!(self, source, "/", Token2::Slash);
-        recognize!(self, source, "^", Token2::Caret);
-        recognize!(self, source, "%", Token2::Percent);
+    ) -> Option<(Spanned<Token<'src>>, &'src str)> {
+        recognize!(self, source, "..=", Token::RangeInclusive);
+        recognize!(self, source, "...", Token::VariadicArgs);
+        recognize!(self, source, "..", Token::Range);
+
+        recognize!(self, source, "::", Token::PathSeparator);
+
+        recognize!(self, source, "->", Token::ParameterArrow);
+        recognize!(self, source, "=>", Token::FatArrow);
+
+        recognize!(self, source, "==", Token::EqualCheck);
+        recognize!(self, source, "!=", Token::NotEqual);
+
+        recognize!(self, source, "<=", Token::LessThanEq);
+        recognize!(self, source, ">=", Token::GreaterThanEq);
+
+        recognize!(self, source, "&&", Token::BooleanAnd);
+        recognize!(self, source, "||", Token::BooleanOr);
+
+        recognize!(self, source, ">>=", Token::ShiftRightAssign);
+        recognize!(self, source, "<<=", Token::ShiftLeftAssign);
+        recognize!(self, source, ">>", Token::ShiftRight);
+        recognize!(self, source, "<<", Token::ShiftLeft);
+
+        recognize!(self, source, "+=", Token::AddAssign);
+        recognize!(self, source, "-=", Token::SubAssign);
+        recognize!(self, source, "*=", Token::MulAssign);
+        recognize!(self, source, "/=", Token::DivAssign);
+        recognize!(self, source, "%=", Token::ModAssign);
+        recognize!(self, source, "^=", Token::XorAssign);
+        recognize!(self, source, "&=", Token::AndAssign);
+        recognize!(self, source, "|=", Token::OrAssign);
+
+        recognize!(self, source, "(", Token::OpenParen);
+        recognize!(self, source, ")", Token::CloseParen);
+        recognize!(self, source, "{", Token::OpenBrace);
+        recognize!(self, source, "}", Token::CloseBrace);
+        recognize!(self, source, "[", Token::OpenBracket);
+        recognize!(self, source, "]", Token::CloseBracket);
+
+        recognize!(self, source, ":", Token::Colon);
+        recognize!(self, source, ";", Token::Semi);
+        recognize!(self, source, ",", Token::Comma);
+        recognize!(self, source, ".", Token::Dot);
+        recognize!(self, source, "@", Token::At);
+        recognize!(self, source, "#", Token::Pound);
+        recognize!(self, source, "~", Token::Tilde);
+        recognize!(self, source, "?", Token::Question);
+        recognize!(self, source, "$", Token::Dollar);
+        recognize!(self, source, "=", Token::Eq);
+        recognize!(self, source, "!", Token::Not);
+        recognize!(self, source, "<", Token::LessThan);
+        recognize!(self, source, ">", Token::GreatherThan);
+        recognize!(self, source, "-", Token::Minus);
+        recognize!(self, source, "&", Token::And);
+        recognize!(self, source, "|", Token::Or);
+        recognize!(self, source, "+", Token::Plus);
+        recognize!(self, source, "*", Token::Star);
+        recognize!(self, source, "/", Token::Slash);
+        recognize!(self, source, "^", Token::Caret);
+        recognize!(self, source, "%", Token::Percent);
 
         None
     }
@@ -331,17 +335,17 @@ impl Tokenizer {
     pub fn recognize_token<'src>(
         &mut self,
         src: &'src str,
-    ) -> Option<(Option<Token<'src>>, &'src str)> {
+    ) -> Option<(Option<Spanned<Token<'src>>>, &'src str)> {
         debug_assert!(!src.is_empty());
 
         let rustc_lexer::Token { kind, len } = rustc_lexer::first_token(src);
         let (token_str, rest) = src.split_at(len);
 
         let token = match kind {
-            TokenKind::Ident => Token2::Ident(token_str),
-            TokenKind::Lifetime { .. } => Token2::Lifetime(token_str),
-            TokenKind::Literal { .. } => Token2::Literal(token_str),
-            TokenKind::RawIdent => Token2::RawIdent(token_str),
+            TokenKind::Ident => Token::Ident(token_str),
+            TokenKind::Lifetime { .. } => Token::Lifetime(token_str),
+            TokenKind::Literal { .. } => Token::Literal(token_str),
+            TokenKind::RawIdent => Token::RawIdent(token_str),
             TokenKind::Whitespace | TokenKind::LineComment | TokenKind::BlockComment { .. } => {
                 return Some((None, rest))
             }
@@ -353,7 +357,7 @@ impl Tokenizer {
             } // handled by recognize_multichar_token
         };
 
-        let token = Token::new(token, self.line, self.char);
+        let token = Spanned::new(token, self.line, self.char);
 
         let lines = token_str.split('\n').collect::<Vec<_>>();
         let count = lines.len();
@@ -372,7 +376,7 @@ impl Tokenizer {
     }
 }
 
-pub fn tokenize_file(mut source: &str) -> anyhow::Result<Vec<Token<'_>>> {
+pub fn tokenize_file(mut source: &str) -> anyhow::Result<Vec<Spanned<Token<'_>>>> {
     let mut tokenizer = Tokenizer::new();
 
     let parsed = syn::parse_file(source)

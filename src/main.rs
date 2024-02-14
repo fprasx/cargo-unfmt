@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 use anyhow::Context;
 use cargo_unfmt::{
     formatters::BlockUnformatter,
-    tokenizer::{self},
+    tokenizer::{self, Spanned},
     Unformat,
 };
 use walkdir::WalkDir;
@@ -47,7 +47,7 @@ pub fn test_rustfmt() -> anyhow::Result<()> {
                 &tokenizer::tokenize_file(&src)
                     .with_context(|| format!("failed to parse: {:?}", file.path()))?
                     .into_iter()
-                    .map(|token| token.inner)
+                    .map(Spanned::into_inner)
                     .collect::<Vec<_>>(),
             );
             fs::write(&path, &formatted).context("failed to write formatted source over")?;

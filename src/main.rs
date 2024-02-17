@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 use anyhow::Context;
 use cargo_unfmt::{
     formatters::BlockUnformatter,
-    tokenizer::{self, Spanned},
+    lex::{self, Spanned},
     Unformat,
 };
 use walkdir::WalkDir;
@@ -44,7 +44,7 @@ pub fn test_rustfmt() -> anyhow::Result<()> {
                 String::from_utf8(fs::read(file.path()).context("failed to read source file")?)
                     .context("file was not utf-8")?;
             let formatted = BlockUnformatter::<80>.unformat(
-                &tokenizer::tokenize_file(&src)
+                &lex::lex_file(&src)
                     .with_context(|| format!("failed to parse: {:?}", file.path()))?
                     .into_iter()
                     .map(Spanned::into_inner)

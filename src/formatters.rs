@@ -1,4 +1,4 @@
-use crate::{append, tokenizer::Token, Unformat};
+use crate::{append, lex::Token, Unformat};
 
 pub struct BlockUnformatter<const N: usize>;
 

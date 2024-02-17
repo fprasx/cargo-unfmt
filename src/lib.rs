@@ -1,9 +1,9 @@
-use tokenizer::{Affinity, Token};
+use lex::{Affinity, Token};
 
 pub mod visitors;
 
 pub mod formatters;
-pub mod tokenizer;
+pub mod lex;
 
 const JUNK: &[&str] = &[
     "",

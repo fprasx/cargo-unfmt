@@ -34,8 +34,9 @@ impl<T> Spanned<T> {
     }
 }
 
+/// Internal type that keeps line/char counts as we lex.
 #[derive(Debug, PartialEq, Eq, Default)]
-pub struct Tokenizer {
+struct Tokenizer {
     line: usize,
     char: usize,
 }
@@ -49,6 +50,160 @@ macro_rules! recognize {
             return Some((token, remainder));
         }
     };
+}
+
+pub fn lex_file(mut source: &str) -> anyhow::Result<Vec<Spanned<Token<'_>>>> {
+    let mut tokenizer = Tokenizer::new();
+
+    let parsed = syn::parse_file(source)
+        .map_err(|e| anyhow!(display_syn_error(e)))
+        .context("not valid Rust syntax")?;
+
+    let mut macros = MacroVisitor::new();
+    macros.visit_file(&parsed);
+
+    let mut tokens = vec![];
+
+    while !source.is_empty() {
+        if let Some((token, rest)) = tokenizer.lex_textual_token(source) {
+            // Token is None if it lex_textual_token just stripped away whitespace
+            if let Some(token) = token {
+                tokens.push(token);
+            }
+            source = rest;
+        } else if let Some((token, rest)) = tokenizer.lex_punctuation_token(source) {
+            tokens.push(token); // Option<Token> implements iter
+            source = rest;
+        } else {
+            panic!("file should be valid rust syntax but could not detect next token")
+        }
+    }
+    Ok(tokens)
+}
+
+impl Tokenizer {
+    fn new() -> Self {
+        Self { line: 1, char: 1 }
+    }
+
+    /// Lexes simple tokens consisting of punction, such as operators.
+    ///
+    /// We have a custom function for doing this because rustc_lexer is extremely
+    /// granular. For example, it will barse && as two binary &'s instead of as
+    /// && (logical and).
+    fn lex_punctuation_token<'src>(
+        &mut self,
+        source: &'src str,
+    ) -> Option<(Spanned<Token<'src>>, &'src str)> {
+        recognize!(self, source, "..=", Token::RangeInclusive);
+        recognize!(self, source, "...", Token::VariadicArgs);
+        recognize!(self, source, "..", Token::Range);
+
+        recognize!(self, source, "::", Token::PathSeparator);
+
+        recognize!(self, source, "->", Token::ParameterArrow);
+        recognize!(self, source, "=>", Token::FatArrow);
+
+        recognize!(self, source, "==", Token::EqualCheck);
+        recognize!(self, source, "!=", Token::NotEqual);
+
+        recognize!(self, source, "<=", Token::LessThanEq);
+        recognize!(self, source, ">=", Token::GreaterThanEq);
+
+        recognize!(self, source, "&&", Token::BooleanAnd);
+        recognize!(self, source, "||", Token::BooleanOr);
+
+        recognize!(self, source, ">>=", Token::ShiftRightAssign);
+        recognize!(self, source, "<<=", Token::ShiftLeftAssign);
+        recognize!(self, source, ">>", Token::ShiftRight);
+        recognize!(self, source, "<<", Token::ShiftLeft);
+
+        recognize!(self, source, "+=", Token::AddAssign);
+        recognize!(self, source, "-=", Token::SubAssign);
+        recognize!(self, source, "*=", Token::MulAssign);
+        recognize!(self, source, "/=", Token::DivAssign);
+        recognize!(self, source, "%=", Token::ModAssign);
+        recognize!(self, source, "^=", Token::XorAssign);
+        recognize!(self, source, "&=", Token::AndAssign);
+        recognize!(self, source, "|=", Token::OrAssign);
+
+        recognize!(self, source, "(", Token::OpenParen);
+        recognize!(self, source, ")", Token::CloseParen);
+        recognize!(self, source, "{", Token::OpenBrace);
+        recognize!(self, source, "}", Token::CloseBrace);
+        recognize!(self, source, "[", Token::OpenBracket);
+        recognize!(self, source, "]", Token::CloseBracket);
+
+        recognize!(self, source, ":", Token::Colon);
+        recognize!(self, source, ";", Token::Semi);
+        recognize!(self, source, ",", Token::Comma);
+        recognize!(self, source, ".", Token::Dot);
+        recognize!(self, source, "@", Token::At);
+        recognize!(self, source, "#", Token::Pound);
+        recognize!(self, source, "~", Token::Tilde);
+        recognize!(self, source, "?", Token::Question);
+        recognize!(self, source, "$", Token::Dollar);
+        recognize!(self, source, "=", Token::Eq);
+        recognize!(self, source, "!", Token::Not);
+        recognize!(self, source, "<", Token::LessThan);
+        recognize!(self, source, ">", Token::GreatherThan);
+        recognize!(self, source, "-", Token::Minus);
+        recognize!(self, source, "&", Token::And);
+        recognize!(self, source, "|", Token::Or);
+        recognize!(self, source, "+", Token::Plus);
+        recognize!(self, source, "*", Token::Star);
+        recognize!(self, source, "/", Token::Slash);
+        recognize!(self, source, "^", Token::Caret);
+        recognize!(self, source, "%", Token::Percent);
+
+        None
+    }
+
+    /// Lexes textual tokens such as indentifiers.
+    ///
+    /// Returns `Some((None, src))` if the next token is a comment or whitespace.
+    pub fn lex_textual_token<'src>(
+        &mut self,
+        src: &'src str,
+    ) -> Option<(Option<Spanned<Token<'src>>>, &'src str)> {
+        debug_assert!(!src.is_empty());
+
+        let rustc_lexer::Token { kind, len } = rustc_lexer::first_token(src);
+        let (token_str, rest) = src.split_at(len);
+
+        let token = match kind {
+            TokenKind::Ident => Token::Ident(token_str),
+            TokenKind::Lifetime { .. } => Token::Lifetime(token_str),
+            TokenKind::Literal { .. } => Token::Literal(token_str),
+            TokenKind::RawIdent => Token::RawIdent(token_str),
+            TokenKind::Whitespace | TokenKind::LineComment | TokenKind::BlockComment { .. } => {
+                return Some((None, rest))
+            }
+            TokenKind::Unknown => {
+                panic!("src must correspond to valid rust | invalid token: {token_str}")
+            }
+            _ => {
+                return None; // handled by recognize_multichar_token
+            }
+        };
+
+        let token = Spanned::new(token, self.line, self.char);
+
+        let lines = token_str.split('\n').collect::<Vec<_>>();
+        let count = lines.len();
+        let last = lines
+            .last()
+            .expect("split always returns at least one string");
+
+        self.line += count - 1;
+
+        match count {
+            1 => self.char += last.len(),
+            _ => self.char = last.len() + 1,
+        }
+
+        Some((Some(token), rest))
+    }
 }
 
 impl Display for Token<'_> {
@@ -250,158 +405,4 @@ impl<'a> Nature for Token<'a> {
             | Token::Percent => Affinity::Tight,
         }
     }
-}
-
-impl Tokenizer {
-    pub fn new() -> Self {
-        Self { line: 1, char: 1 }
-    }
-
-    /// Detects simple tokens such as operators at the beginning of source, returning
-    /// the new source with the token stripped away if successful.
-    fn recognize_multichar_token<'src>(
-        &mut self,
-        source: &'src str,
-    ) -> Option<(Spanned<Token<'src>>, &'src str)> {
-        recognize!(self, source, "..=", Token::RangeInclusive);
-        recognize!(self, source, "...", Token::VariadicArgs);
-        recognize!(self, source, "..", Token::Range);
-
-        recognize!(self, source, "::", Token::PathSeparator);
-
-        recognize!(self, source, "->", Token::ParameterArrow);
-        recognize!(self, source, "=>", Token::FatArrow);
-
-        recognize!(self, source, "==", Token::EqualCheck);
-        recognize!(self, source, "!=", Token::NotEqual);
-
-        recognize!(self, source, "<=", Token::LessThanEq);
-        recognize!(self, source, ">=", Token::GreaterThanEq);
-
-        recognize!(self, source, "&&", Token::BooleanAnd);
-        recognize!(self, source, "||", Token::BooleanOr);
-
-        recognize!(self, source, ">>=", Token::ShiftRightAssign);
-        recognize!(self, source, "<<=", Token::ShiftLeftAssign);
-        recognize!(self, source, ">>", Token::ShiftRight);
-        recognize!(self, source, "<<", Token::ShiftLeft);
-
-        recognize!(self, source, "+=", Token::AddAssign);
-        recognize!(self, source, "-=", Token::SubAssign);
-        recognize!(self, source, "*=", Token::MulAssign);
-        recognize!(self, source, "/=", Token::DivAssign);
-        recognize!(self, source, "%=", Token::ModAssign);
-        recognize!(self, source, "^=", Token::XorAssign);
-        recognize!(self, source, "&=", Token::AndAssign);
-        recognize!(self, source, "|=", Token::OrAssign);
-
-        recognize!(self, source, "(", Token::OpenParen);
-        recognize!(self, source, ")", Token::CloseParen);
-        recognize!(self, source, "{", Token::OpenBrace);
-        recognize!(self, source, "}", Token::CloseBrace);
-        recognize!(self, source, "[", Token::OpenBracket);
-        recognize!(self, source, "]", Token::CloseBracket);
-
-        recognize!(self, source, ":", Token::Colon);
-        recognize!(self, source, ";", Token::Semi);
-        recognize!(self, source, ",", Token::Comma);
-        recognize!(self, source, ".", Token::Dot);
-        recognize!(self, source, "@", Token::At);
-        recognize!(self, source, "#", Token::Pound);
-        recognize!(self, source, "~", Token::Tilde);
-        recognize!(self, source, "?", Token::Question);
-        recognize!(self, source, "$", Token::Dollar);
-        recognize!(self, source, "=", Token::Eq);
-        recognize!(self, source, "!", Token::Not);
-        recognize!(self, source, "<", Token::LessThan);
-        recognize!(self, source, ">", Token::GreatherThan);
-        recognize!(self, source, "-", Token::Minus);
-        recognize!(self, source, "&", Token::And);
-        recognize!(self, source, "|", Token::Or);
-        recognize!(self, source, "+", Token::Plus);
-        recognize!(self, source, "*", Token::Star);
-        recognize!(self, source, "/", Token::Slash);
-        recognize!(self, source, "^", Token::Caret);
-        recognize!(self, source, "%", Token::Percent);
-
-        None
-    }
-
-    /// Returns `None` if the next character is not a character based token.
-    /// Returns `Some((None, new_source))` if the next token is a comment or
-    /// whitespace.
-    ///
-    /// **Note**: `src` must not be empty.
-    pub fn recognize_token<'src>(
-        &mut self,
-        src: &'src str,
-    ) -> Option<(Option<Spanned<Token<'src>>>, &'src str)> {
-        debug_assert!(!src.is_empty());
-
-        let rustc_lexer::Token { kind, len } = rustc_lexer::first_token(src);
-        let (token_str, rest) = src.split_at(len);
-
-        let token = match kind {
-            TokenKind::Ident => Token::Ident(token_str),
-            TokenKind::Lifetime { .. } => Token::Lifetime(token_str),
-            TokenKind::Literal { .. } => Token::Literal(token_str),
-            TokenKind::RawIdent => Token::RawIdent(token_str),
-            TokenKind::Whitespace | TokenKind::LineComment | TokenKind::BlockComment { .. } => {
-                return Some((None, rest))
-            }
-            TokenKind::Unknown => {
-                panic!("src must correspond to valid rust | invalid token: {token_str}")
-            }
-            _ => {
-                return None;
-            } // handled by recognize_multichar_token
-        };
-
-        let token = Spanned::new(token, self.line, self.char);
-
-        let lines = token_str.split('\n').collect::<Vec<_>>();
-        let count = lines.len();
-        let last = lines
-            .last()
-            .expect("split always returns at least one string");
-
-        self.line += count - 1;
-
-        match count {
-            1 => self.char += last.len(),
-            _ => self.char = last.len() + 1,
-        }
-
-        Some((Some(token), rest))
-    }
-}
-
-pub fn tokenize_file(mut source: &str) -> anyhow::Result<Vec<Spanned<Token<'_>>>> {
-    let mut tokenizer = Tokenizer::new();
-
-    let parsed = syn::parse_file(source)
-        .map_err(|e| anyhow!(display_syn_error(e)))
-        .context("not valid Rust syntax")?;
-
-    let mut macros = MacroVisitor::new();
-    macros.visit_file(&parsed);
-
-    let mut tokens = vec![];
-
-    while !source.is_empty() {
-        // rustc_lexer's tokens are very granular, as in two &'s instead of
-        // an &&, so we recognize multicharacter tokens like operators manually.
-        if let Some((token, rest)) = tokenizer.recognize_token(source) {
-            if let Some(token) = token {
-                tokens.push(token);
-            }
-            source = rest;
-        } else if let Some((token, rest)) = tokenizer.recognize_multichar_token(source) {
-            tokens.push(token); // Option<Token> implements iter
-            source = rest;
-        } else {
-            panic!("file should be valid rust syntax but could not detect next token")
-        }
-    }
-    Ok(tokens)
 }

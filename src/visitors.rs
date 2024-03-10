@@ -1,3 +1,7 @@
+// NOTE: macro input is not parsed in any way, so when we search for statements,
+// idents, whatever, nothing in a macro is reported! This is great, since we can't
+// alter what is inside a macro.
+
 use proc_macro2::{LineColumn, Span};
 use syn::{spanned::Spanned, visit::Visit};
 
@@ -12,8 +16,8 @@ pub enum RelativePosition {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Region {
     line_start: usize,
-    line_end: usize,
     col_start: usize,
+    line_end: usize,
     col_end: usize,
 }
 
@@ -29,7 +33,8 @@ impl From<Span> for Region {
         } = span.end();
         Self {
             line_start,
-            col_start,
+            // proc-macro2 spans set the column start to the column before the start
+            col_start: col_start + 1,
             line_end,
             col_end,
         }
@@ -84,6 +89,27 @@ impl MacroVisitor {
 
 impl Visit<'_> for MacroVisitor {
     fn visit_macro(&mut self, i: &'_ syn::Macro) {
+        self.regions.push(i.span().into())
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct StmtVisitor {
+    regions: Vec<Region>,
+}
+
+impl StmtVisitor {
+    pub fn new() -> Self {
+        Self { regions: vec![] }
+    }
+
+    pub fn spans(&self) -> &[Region] {
+        self.regions.as_slice()
+    }
+}
+
+impl Visit<'_> for StmtVisitor {
+    fn visit_stmt(&mut self, i: &'_ syn::Stmt) {
         self.regions.push(i.span().into())
     }
 }

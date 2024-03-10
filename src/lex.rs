@@ -177,7 +177,8 @@ impl Tokenizer {
             TokenKind::Literal { .. } => Token::Literal(token_str),
             TokenKind::RawIdent => Token::RawIdent(token_str),
             TokenKind::Whitespace | TokenKind::LineComment | TokenKind::BlockComment { .. } => {
-                return Some((None, rest))
+                self.advance_counts(token_str);
+                return Some((None, rest));
             }
             TokenKind::Unknown => {
                 panic!("src must correspond to valid rust | invalid token: {token_str}")
@@ -188,8 +189,13 @@ impl Tokenizer {
         };
 
         let token = Spanned::new(token, self.line, self.char);
+        self.advance_counts(token_str);
 
-        let lines = token_str.split('\n').collect::<Vec<_>>();
+        Some((Some(token), rest))
+    }
+
+    fn advance_counts(&mut self, token: &str) {
+        let lines = token.split('\n').collect::<Vec<_>>();
         let count = lines.len();
         let last = lines
             .last()
@@ -201,8 +207,6 @@ impl Tokenizer {
             1 => self.char += last.len(),
             _ => self.char = last.len() + 1,
         }
-
-        Some((Some(token), rest))
     }
 }
 
@@ -343,6 +347,11 @@ impl<'a> Token<'a> {
             Token::Caret => "^",
             Token::Percent => "%",
         }
+    }
+
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.as_str().len()
     }
 }
 

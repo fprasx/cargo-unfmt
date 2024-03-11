@@ -3,6 +3,7 @@ use lex::{Affinity, Token};
 pub mod visitors;
 
 pub mod formatters;
+pub mod ir;
 pub mod lex;
 
 const JUNK: &[&str] = &[

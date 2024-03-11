@@ -1,10 +1,11 @@
+//! THis is so jank I hope I never have to touch it again.
+
 use std::fmt::Display;
 
 use anyhow::{anyhow, Context};
 use rustc_lexer::TokenKind;
-use syn::visit::Visit;
 
-use crate::{visitors::MacroVisitor, Nature};
+use crate::Nature;
 
 // The default display for syn errors is extremely minimal.
 pub fn display_syn_error(e: syn::Error) -> String {
@@ -55,12 +56,10 @@ macro_rules! recognize {
 pub fn lex_file(mut source: &str) -> anyhow::Result<Vec<Spanned<Token<'_>>>> {
     let mut tokenizer = Tokenizer::new();
 
-    let parsed = syn::parse_file(source)
+    // Verify file is valid rust syntax
+    syn::parse_file(source)
         .map_err(|e| anyhow!(display_syn_error(e)))
         .context("not valid Rust syntax")?;
-
-    let mut macros = MacroVisitor::new();
-    macros.visit_file(&parsed);
 
     let mut tokens = vec![];
 

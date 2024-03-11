@@ -1,6 +1,9 @@
-// NOTE: macro input is not parsed in any way, so when we search for statements,
-// idents, whatever, nothing in a macro is reported! This is great, since we can't
-// alter what is inside a macro.
+//! Helpers for finding the locations of AST nodes in the code. Useful for identifying
+//! where we can put junk.
+//!
+//! Since macro input is not parsed in any way, when we search for statements (or
+//! any other AST node), nothing in a macro is reported! This is great, since we
+//! can't alter macro contents.
 
 use proc_macro2::{LineColumn, Span};
 use syn::{spanned::Spanned, visit::Visit};
@@ -83,27 +86,6 @@ impl Region {
         // On line entirely after region
         assert!(line >= self.line_end);
         RelativePosition::After
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct MacroVisitor {
-    regions: Vec<Region>,
-}
-
-impl MacroVisitor {
-    pub fn new() -> Self {
-        Self { regions: vec![] }
-    }
-
-    pub fn spans(&self) -> &[Region] {
-        self.regions.as_slice()
-    }
-}
-
-impl Visit<'_> for MacroVisitor {
-    fn visit_macro(&mut self, i: &'_ syn::Macro) {
-        self.regions.push(i.span().into())
     }
 }
 

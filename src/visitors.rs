@@ -42,32 +42,46 @@ impl From<Span> for Region {
 }
 
 impl Region {
-    /// Check if this region contains a given (line, column) pair
-    pub fn contains(&self, line: usize, col: usize) -> RelativePosition {
+    /// Check if this region contains a token starting at a given (line, column) pair.
+    pub fn contains<T>(&self, spanned: &crate::lex::Spanned<T>) -> RelativePosition {
+        let line = spanned.line;
+        let col = spanned.char;
+        // On line entirely before region
         if line < self.line_start {
             return RelativePosition::Before;
         }
 
+        // On first line of region
         if line == self.line_start {
+            // We know the column start of a region is on a token boundary, so
+            // if the column of the token precedes the start of the boundary, that
+            // token is not in the boundary (at all)
             if col < self.col_start {
                 return RelativePosition::Before;
-            } else {
-                return RelativePosition::Within;
             }
+
+            return RelativePosition::Within;
         }
 
+        // Line is within region
         if (self.line_start + 1..self.line_end.saturating_sub(1)).contains(&line) {
             return RelativePosition::Within;
         }
 
+        // On last line of region
         if line == self.line_end {
+            // The column end of a region refers to the last column of the last
+            // token in in the region, so if the start of the token is before
+            // this, it is fully contained in the region.
             if col <= self.col_end {
                 return RelativePosition::Within;
-            } else {
-                return RelativePosition::After;
             }
+
+            return RelativePosition::After;
         }
 
+        // On line entirely after region
+        assert!(line >= self.line_end);
         RelativePosition::After
     }
 }

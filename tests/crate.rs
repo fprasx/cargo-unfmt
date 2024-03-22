@@ -1,7 +1,7 @@
 use cargo_unfmt::{
-    formatters::BlockUnformatter,
+    emit,
+    ir::RichToken,
     lex::{self, Spanned},
-    Unformat,
 };
 
 use std::{fs, path::Path};
@@ -28,10 +28,13 @@ pub fn test_crate(krate: &str) -> anyhow::Result<()> {
         // Ignore tests directories, since those often contain code that needs
         // to be formatted a certain way, a least for rustfmt, and probably for
         // rustc
+        //
+        // Also ignore git directories as we are unable to overwrite them due to
+        // their permissions
         if file
             .path()
             .to_str()
-            .map(|file| file.contains("tests"))
+            .map(|file| file.contains("tests") || file.contains(".git"))
             .unwrap_or(false)
         {
             continue;
@@ -52,13 +55,15 @@ pub fn test_crate(krate: &str) -> anyhow::Result<()> {
         if path.extension().is_some_and(|ext| ext == "rs") {
             let src = fs::read_to_string(file.path())
                 .with_context(|| format!("failed to read source file: {path:?}"))?;
-            let formatted = BlockUnformatter::<80>.unformat(
-                &lex::lex_file(&src)
-                    .with_context(|| format!("failed to parse: {:?}", file.path()))?
-                    .into_iter()
-                    .map(Spanned::into_inner)
-                    .collect::<Vec<_>>(),
-            );
+            let tokens = lex::lex_file(&src)
+                .with_context(|| format!("failed to parse: {:?}", file.path()))?
+                .into_iter()
+                .map(Spanned::into_inner)
+                .collect::<Vec<_>>();
+
+            let rich_tokens = RichToken::new(tokens.into_iter());
+            let mut formatted = vec![];
+            emit::line_by_line(&mut formatted, &rich_tokens);
             fs::write(&path, &formatted).context("failed to write formatted source over")?;
         } else {
             fs::copy(file.path(), &path).context("failed to copy file over")?;
@@ -70,5 +75,5 @@ pub fn test_crate(krate: &str) -> anyhow::Result<()> {
 
 #[test]
 fn rustfmt() {
-    test_crate("rustfmt").expect("failed to unformat rustfmt");
+    test_crate("veloren").expect("failed to unformat rustfmt");
 }

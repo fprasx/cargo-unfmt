@@ -1,15 +1,13 @@
 use anyhow::Context;
+use cargo_unfmt::{ir::RichToken, lex::Spanned};
 
 fn main() -> anyhow::Result<()> {
-    use cargo_unfmt::visitors::StmtVisitor;
-    use syn::visit::Visit;
-    let src = include_str!("../test_files/short-rust-file.rs");
-    let file = syn::parse_file(src).unwrap();
-    let tokens = cargo_unfmt::lex::lex_file(src).context("faile to tokenize")?;
-    let mut idents = StmtVisitor::new();
-    idents.visit_file(&file);
-    println!("{idents:#?}");
+    // let src = include_str!("../test_files/long-rust-file.rs");
+    let src = "fn main() { let x: ::std::usize = 1; }";
+    let tokens = cargo_unfmt::lex::lex_file(src).context("failed to tokenize")?;
     println!("{tokens:#?}");
+
+    let rts = RichToken::new(tokens.into_iter().map(Spanned::into_inner));
+    println!("{rts:#?}");
     Ok(())
 }
-

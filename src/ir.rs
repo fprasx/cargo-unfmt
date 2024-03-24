@@ -19,7 +19,23 @@ impl<'a> From<Token<'a>> for RichToken<'a> {
 }
 
 impl<'a> RichToken<'a> {
-    pub fn new(tokens: impl Iterator<Item = Token<'a>>) -> Vec<RichToken<'a>> {
+    pub fn as_bytes(&self) -> Cow<[u8]> {
+        match self {
+            RichToken::Junk(n) => Cow::Borrowed(JUNK[*n].as_bytes()),
+            RichToken::Space(n) => Cow::Owned(std::iter::repeat(b' ').take(*n).collect()),
+            RichToken::Spacer => Cow::Borrowed(&[b' ']),
+            RichToken::Token(token) => Cow::Borrowed(token.as_str().as_bytes()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Ir<'a> {
+    tokens: Vec<RichToken<'a>>,
+}
+
+impl<'a> Ir<'a> {
+    pub fn new(tokens: impl Iterator<Item = Token<'a>>) -> Self {
         let mut rts = vec![];
 
         // Nothing repels semicolons, so we just start with this
@@ -59,15 +75,10 @@ impl<'a> RichToken<'a> {
             last = token;
         }
 
-        rts
+        Self { tokens: rts }
     }
 
-    pub fn as_bytes(&self) -> Cow<[u8]> {
-        match self {
-            RichToken::Junk(n) => Cow::Borrowed(JUNK[*n].as_bytes()),
-            RichToken::Space(n) => Cow::Owned(std::iter::repeat(b' ').take(*n).collect()),
-            RichToken::Spacer => Cow::Borrowed(&[b' ']),
-            RichToken::Token(token) => Cow::Borrowed(token.as_str().as_bytes()),
-        }
+    pub fn tokens(&self) -> &[RichToken<'a>] {
+        self.tokens.as_slice()
     }
 }

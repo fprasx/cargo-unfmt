@@ -1,6 +1,6 @@
 use cargo_unfmt::{
     emit,
-    ir::RichToken,
+    ir::Ir,
     lex::{self, Spanned},
 };
 
@@ -61,9 +61,9 @@ pub fn test_crate(krate: &str) -> anyhow::Result<()> {
                 .map(Spanned::into_inner)
                 .collect::<Vec<_>>();
 
-            let rich_tokens = RichToken::new(tokens.into_iter());
+            let ir = Ir::new(tokens.into_iter());
             let mut formatted = vec![];
-            emit::line_by_line(&mut formatted, &rich_tokens);
+            emit::line_by_line(&mut formatted, ir.tokens());
             fs::write(&path, &formatted).context("failed to write formatted source over")?;
         } else {
             fs::copy(file.path(), &path).context("failed to copy file over")?;

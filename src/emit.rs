@@ -14,3 +14,8 @@ pub fn line_by_line(writer: &mut impl Write, tokens: &[RichToken]) {
     }
     writer.flush().unwrap();
 }
+
+/// Unformat into a rectangle
+pub fn block(writer: &mut impl Write, tokens: &[RichToken], width: usize) {
+    todo!()
+}

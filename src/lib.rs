@@ -2,9 +2,9 @@ use lex::{Affinity, Token};
 
 pub mod visitors;
 
+pub mod emit;
 pub mod ir;
 pub mod lex;
-pub mod emit;
 
 const JUNK: &[&str] = &[
     "",

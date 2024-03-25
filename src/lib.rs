@@ -1,6 +1,6 @@
 use lex::{Affinity, Token};
 
-pub mod visitors;
+pub mod location;
 
 pub mod emit;
 pub mod ir;

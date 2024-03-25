@@ -6,7 +6,7 @@
 //! can't alter macro contents.
 
 use proc_macro2::{LineColumn, Span};
-use syn::{spanned::Spanned, visit::Visit};
+use syn::{spanned::Spanned, visit::Visit, Stmt, StmtMacro};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RelativePosition {
@@ -46,7 +46,7 @@ impl From<Span> for Region {
 
 impl Region {
     /// Check if this region contains a token starting at a given (line, column) pair.
-    pub fn contains<T>(&self, spanned: &crate::lex::Spanned<T>) -> RelativePosition {
+    pub fn find<T>(&self, spanned: &crate::lex::Spanned<T>) -> RelativePosition {
         let line = spanned.line;
         let col = spanned.char;
 
@@ -100,13 +100,24 @@ impl StmtVisitor {
         Self { regions: vec![] }
     }
 
-    pub fn spans(&self) -> &[Region] {
+    pub fn regions(&self) -> &[Region] {
         self.regions.as_slice()
     }
 }
 
 impl Visit<'_> for StmtVisitor {
     fn visit_stmt(&mut self, i: &'_ syn::Stmt) {
-        self.regions.push(i.span().into())
+        if let Stmt::Expr(_, None)
+        | Stmt::Macro(StmtMacro {
+            semi_token: None, ..
+        }) = i
+        {
+            // These statements don't have an expression so we can't put junk
+            // after them
+            //
+            // TODO: have multiple statement types so we can put junk before them
+        } else {
+            self.regions.push(i.span().into())
+        }
     }
 }

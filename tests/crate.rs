@@ -1,8 +1,4 @@
-use cargo_unfmt::{
-    emit,
-    ir::Ir,
-    lex::{self, Spanned},
-};
+use cargo_unfmt::emit;
 
 use std::{fs, path::Path};
 
@@ -55,10 +51,9 @@ pub fn test_crate(krate: &str) -> anyhow::Result<()> {
         if path.extension().is_some_and(|ext| ext == "rs") {
             let src = fs::read_to_string(file.path())
                 .with_context(|| format!("failed to read source file: {path:?}"))?;
-            let tokens = lex::lex_file(&src)
-                .with_context(|| format!("failed to parse: {:?}", file.path()))?;
 
-            let ir = Ir::new(tokens.into_iter());
+            let ir = cargo_unfmt::unformat(&src)?;
+
             let mut formatted = vec![];
             emit::line_by_line(&mut formatted, ir.tokens());
             fs::write(&path, &formatted).context("failed to write formatted source over")?;
@@ -72,5 +67,5 @@ pub fn test_crate(krate: &str) -> anyhow::Result<()> {
 
 #[test]
 fn rustfmt() {
-    test_crate("veloren").expect("failed to unformat rustfmt");
+    test_crate("rustfmt").expect("failed to unformat rustfmt");
 }

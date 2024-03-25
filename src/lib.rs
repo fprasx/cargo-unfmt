@@ -1,4 +1,7 @@
-use lex::{Affinity, Token};
+use anyhow::Context;
+use ir::Ir;
+use location::StmtVisitor;
+use syn::visit::Visit;
 
 pub mod location;
 
@@ -17,17 +20,21 @@ const JUNK: &[&str] = &[
     "*&*&();",
     "((),());",
     "let _=();",
-    "if(true){}",
+    "if true{};",
     "let _=||();",
-    "loop{break;}",
-    "if let _=(){}",
-    "while(false){}",
+    "loop{break};",
+    "loop{break;};",
+    "if let _=(){};",
 ];
 
-pub trait Unformat<'a> {
-    fn unformat(self, tokens: &[Token<'a>]) -> String;
-}
+pub fn unformat(src: &str) -> anyhow::Result<Ir> {
+    let tokens = lex::lex_file(&src).context("source was not valid")?;
 
-pub trait Nature {
-    fn affinity(&self) -> Affinity;
+    let mut stmts = StmtVisitor::new();
+    stmts.visit_file(&syn::parse_file(src).unwrap());
+
+    let ir = Ir::new(tokens.into_iter());
+    let ir = ir.populate_junk(stmts.regions());
+
+    Ok(ir)
 }

@@ -5,8 +5,6 @@ use std::fmt::Display;
 use anyhow::{anyhow, Context};
 use rustc_lexer::TokenKind;
 
-use crate::Nature;
-
 // The default display for syn errors is extremely minimal.
 pub fn display_syn_error(e: syn::Error) -> String {
     format!("error @ {:?}: {e}", e.span().start())
@@ -16,6 +14,10 @@ pub fn display_syn_error(e: syn::Error) -> String {
 pub enum Affinity {
     Repel,
     Tight,
+}
+
+pub trait Nature {
+    fn affinity(&self) -> Affinity;
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

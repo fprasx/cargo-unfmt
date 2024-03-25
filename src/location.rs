@@ -49,6 +49,7 @@ impl Region {
     pub fn contains<T>(&self, spanned: &crate::lex::Spanned<T>) -> RelativePosition {
         let line = spanned.line;
         let col = spanned.char;
+
         // On line entirely before region
         if line < self.line_start {
             return RelativePosition::Before;
@@ -67,7 +68,7 @@ impl Region {
         }
 
         // Line is within region
-        if (self.line_start + 1..self.line_end.saturating_sub(1)).contains(&line) {
+        if (self.line_start + 1..=self.line_end.saturating_sub(1)).contains(&line) {
             return RelativePosition::Within;
         }
 

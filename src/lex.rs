@@ -20,7 +20,7 @@ pub enum Affinity {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Spanned<T> {
-    inner: T,
+    pub inner: T,
     pub line: usize,
     pub char: usize,
 }

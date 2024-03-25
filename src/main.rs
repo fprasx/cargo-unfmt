@@ -1,5 +1,5 @@
 use anyhow::Context;
-use cargo_unfmt::{ir::Ir, lex::Spanned};
+use cargo_unfmt::ir::Ir;
 
 fn main() -> anyhow::Result<()> {
     // let src = include_str!("../test_files/long-rust-file.rs");
@@ -7,7 +7,7 @@ fn main() -> anyhow::Result<()> {
     let tokens = cargo_unfmt::lex::lex_file(src).context("failed to tokenize")?;
     println!("{tokens:#?}");
 
-    let ir = Ir::new(tokens.into_iter().map(Spanned::into_inner));
+    let ir = Ir::new(tokens.into_iter());
     println!("{ir:#?}");
     Ok(())
 }

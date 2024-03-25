@@ -16,7 +16,7 @@ pub enum RelativePosition {
 }
 
 /// A region of source code deliminated by a pair of (line, column).
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Region {
     line_start: usize,
     col_start: usize,

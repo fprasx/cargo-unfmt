@@ -56,10 +56,7 @@ pub fn test_crate(krate: &str) -> anyhow::Result<()> {
             let src = fs::read_to_string(file.path())
                 .with_context(|| format!("failed to read source file: {path:?}"))?;
             let tokens = lex::lex_file(&src)
-                .with_context(|| format!("failed to parse: {:?}", file.path()))?
-                .into_iter()
-                .map(Spanned::into_inner)
-                .collect::<Vec<_>>();
+                .with_context(|| format!("failed to parse: {:?}", file.path()))?;
 
             let ir = Ir::new(tokens.into_iter());
             let mut formatted = vec![];

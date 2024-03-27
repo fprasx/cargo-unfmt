@@ -31,12 +31,28 @@ impl<'a> RichToken<'a> {
     pub fn as_bytes(&self) -> Cow<[u8]> {
         match self {
             RichToken::Junk(n) => Cow::Borrowed(JUNK[*n].as_bytes()),
-            RichToken::Space(n) => Cow::Owned(std::iter::repeat(b' ').take(*n).collect()),
+            RichToken::Space(n) => Cow::Owned(b" ".repeat(*n)),
             RichToken::Spacer => Cow::Borrowed(&[b' ']),
             RichToken::Token(token) => Cow::Borrowed(token.inner.as_str().as_bytes()),
             RichToken::EndOfLineComment => Cow::Borrowed("//".as_bytes()),
             RichToken::Comment => Cow::Borrowed("/**/".as_bytes()),
         }
+    }
+
+    pub fn as_str(&self) -> Cow<str> {
+        match self {
+            RichToken::Junk(n) => Cow::Borrowed(JUNK[*n]),
+            RichToken::Space(n) => Cow::Owned(" ".repeat(*n)),
+            RichToken::Spacer => Cow::Borrowed(" "),
+            RichToken::Token(token) => Cow::Borrowed(token.inner.as_str()),
+            RichToken::EndOfLineComment => Cow::Borrowed("//"),
+            RichToken::Comment => Cow::Borrowed("/**/"),
+        }
+    }
+
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.as_str().len()
     }
 }
 
@@ -71,6 +87,13 @@ impl<'a> Ir<'a> {
                 }
                 // .. and => combine to form ..=> which is parsed as an inclusive range
                 (Token::Range, Token::FatArrow) => {
+                    rts.push(RichToken::Spacer);
+                    rts.push(RichToken::Token(token));
+                }
+                (
+                    Token::Ident(_) | Token::RawIdent(_) | Token::Literal(_) | Token::Lifetime(_),
+                    Token::Ident(_) | Token::RawIdent(_) | Token::Literal(_) | Token::Lifetime(_),
+                ) => {
                     rts.push(RichToken::Spacer);
                     rts.push(RichToken::Token(token));
                 }

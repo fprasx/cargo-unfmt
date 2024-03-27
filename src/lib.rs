@@ -9,7 +9,7 @@ pub mod emit;
 pub mod ir;
 pub mod lex;
 
-const JUNK: &[&str] = &[
+const JUNK: [&str; 15] = [
     "",
     ";",
     "{}",

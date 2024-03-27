@@ -182,7 +182,7 @@ impl Tokenizer {
                 return Some((None, rest));
             }
             TokenKind::Unknown => {
-                panic!("src must correspond to valid rust | invalid token: {token_str}")
+                panic!("src must correspond to valid rust | invalid token: '{token_str}'")
             }
             _ => {
                 return None; // handled by recognize_multichar_token

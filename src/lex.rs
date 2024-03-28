@@ -40,7 +40,7 @@ pub struct Spanned<T> {
 }
 
 impl<T> Spanned<T> {
-    pub fn aligns<U>(&self, other: &Spanned<U>) -> bool {
+    pub fn aligns_with<U>(&self, other: &Spanned<U>) -> bool {
         self.region == other.region
     }
 }

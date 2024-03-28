@@ -122,7 +122,7 @@ impl<'a> Ir<'a> {
                 | RichToken::Comment => out.push(token),
                 RichToken::Token(inner) => {
                     if let Some(junk) = stmts.first() {
-                        if inner.aligns(junk) {
+                        if inner.aligns_with(junk) {
                             match junk.inner {
                                 StatementPos::Before => {
                                     out.push(RichToken::Junk(0));

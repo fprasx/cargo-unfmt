@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::{
     lex::{Spanned, Token},
-    location::{Region, RelativePosition},
+    location::StatementPos,
     JUNK,
 };
 
@@ -109,57 +109,42 @@ impl<'a> Ir<'a> {
     }
 
     /// Add junk tokens where legal.
-    pub fn populate_junk(&self, regions: &[Region]) -> Ir<'a> {
-        let mut tokens = vec![];
-        let mut src_tokens = self.tokens.iter().cloned().peekable();
+    pub fn populate_junk(&self, mut stmts: &[Spanned<StatementPos>]) -> Ir<'a> {
+        let mut out = vec![];
+        let tokens = self.tokens.iter().cloned().peekable();
 
-        for region in regions {
-            if src_tokens.peek().is_none() {
-                break;
-            }
-
-            while let Some(token) = src_tokens.by_ref().next_if(|token| match token {
+        for token in tokens {
+            match token {
                 RichToken::Junk(_)
                 | RichToken::Space(_)
                 | RichToken::Spacer
                 | RichToken::EndOfLineComment
-                | RichToken::Comment => true,
-                RichToken::Token(inner) => match region.find(inner) {
-                    RelativePosition::Before => true,
-                    RelativePosition::Within => false,
-                    RelativePosition::After => panic!("{inner:?}"),
-                },
-            }) {
-                tokens.push(token);
-            }
-
-            if !matches!(tokens.last(), Some(RichToken::Junk(_))) {
-                tokens.push(RichToken::Junk(0));
-            }
-
-            while let Some(token) = src_tokens.by_ref().next_if(|token| match token {
-                RichToken::Junk(_)
-                | RichToken::Space(_)
-                | RichToken::Spacer
-                | RichToken::EndOfLineComment
-                | RichToken::Comment => true,
-                RichToken::Token(inner) => match region.find(inner) {
-                    RelativePosition::Before => panic!("{inner:?}"),
-                    RelativePosition::Within => true,
-                    RelativePosition::After => false,
-                },
-            }) {
-                tokens.push(token);
-            }
-
-            if !matches!(tokens.last(), Some(RichToken::Junk(_))) {
-                tokens.push(RichToken::Junk(0));
+                | RichToken::Comment => out.push(token),
+                RichToken::Token(inner) => {
+                    if let Some(junk) = stmts.first() {
+                        if inner.aligns(junk) {
+                            match junk.inner {
+                                StatementPos::Before => {
+                                    out.push(RichToken::Junk(0));
+                                    out.push(token);
+                                }
+                                StatementPos::After => {
+                                    out.push(token);
+                                    out.push(RichToken::Junk(0));
+                                }
+                            }
+                            stmts = &stmts[1..];
+                        } else {
+                            out.push(token)
+                        }
+                    } else {
+                        out.push(token)
+                    }
+                }
             }
         }
 
-        tokens.extend(src_tokens);
-
-        Self { tokens }
+        Ir { tokens: out }
     }
 
     pub fn tokens(&self) -> &[RichToken<'a>] {

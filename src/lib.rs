@@ -12,7 +12,7 @@ pub mod lex;
 const JUNK: [&str; 15] = [
     "",
     ";",
-    "{}",
+    "3;",
     "();",
     "{;};",
     "({});",
@@ -28,7 +28,7 @@ const JUNK: [&str; 15] = [
 ];
 
 pub fn unformat(src: &str) -> anyhow::Result<Ir> {
-    let tokens = lex::lex_file(&src).context("source was not valid")?;
+    let tokens = lex::lex_file(src).context("source was not valid")?;
 
     let mut stmts = StmtVisitor::new();
     stmts.visit_file(&syn::parse_file(src).unwrap());

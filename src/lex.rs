@@ -1,8 +1,9 @@
-//! THis is so jank I hope I never have to touch it again.
+//! This is so jank I hope I never have to touch it again.
 
 use std::fmt::Display;
 
 use anyhow::{anyhow, Context};
+use proc_macro2::{LineColumn, Span};
 use rustc_lexer::TokenKind;
 
 // The default display for syn errors is extremely minimal.
@@ -10,26 +11,44 @@ pub fn display_syn_error(e: syn::Error) -> String {
     format!("error @ {:?}: {e}", e.span().start())
 }
 
+/// Starting line and column of a token. Uniquely identifies a token in the source
+/// code.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Affinity {
-    Repel,
-    Tight,
+pub struct TokenStart {
+    pub line: usize,
+    pub char: usize,
 }
 
-pub trait Nature {
-    fn affinity(&self) -> Affinity;
+impl From<Span> for TokenStart {
+    fn from(span: Span) -> Self {
+        let LineColumn {
+            line: line_start,
+            column: col_start,
+        } = span.start();
+        Self {
+            line: line_start,
+            // proc-macro2 spans set the column start to the column before the start
+            char: col_start + 1,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Spanned<T> {
     pub inner: T,
-    pub line: usize,
-    pub char: usize,
+    pub region: TokenStart,
+}
+
+impl<T> Spanned<T> {
+    pub fn aligns<U>(&self, other: &Spanned<U>) -> bool {
+        self.region == other.region
+    }
 }
 
 impl<T> Spanned<T> {
     pub fn new(inner: T, line: usize, char: usize) -> Self {
-        Self { inner, line, char }
+        let region = TokenStart { line, char };
+        Self { inner, region }
     }
 
     pub fn into_inner(self) -> T {
@@ -39,7 +58,7 @@ impl<T> Spanned<T> {
 
 /// Internal type that keeps line/char counts as we lex.
 #[derive(Debug, PartialEq, Eq, Default)]
-struct Tokenizer {
+struct Lexer {
     line: usize,
     char: usize,
 }
@@ -49,14 +68,14 @@ macro_rules! recognize {
         if let Some(remainder) = $source.strip_prefix($token) {
             let token = $tokenfn;
             let token = Spanned::new(token, $self.line, $self.char);
-            $self.char += $token.len();
+            $self.char += $token.safe_len();
             return Some((token, remainder));
         }
     };
 }
 
 pub fn lex_file(mut source: &str) -> anyhow::Result<Vec<Spanned<Token<'_>>>> {
-    let mut tokenizer = Tokenizer::new();
+    let mut tokenizer = Lexer::new();
 
     // Verify file is valid rust syntax
     syn::parse_file(source)
@@ -79,10 +98,11 @@ pub fn lex_file(mut source: &str) -> anyhow::Result<Vec<Spanned<Token<'_>>>> {
             panic!("file should be valid rust syntax but could not detect next token")
         }
     }
+
     Ok(tokens)
 }
 
-impl Tokenizer {
+impl Lexer {
     fn new() -> Self {
         Self { line: 1, char: 1 }
     }
@@ -205,15 +225,9 @@ impl Tokenizer {
         self.line += count - 1;
 
         match count {
-            1 => self.char += last.len(),
-            _ => self.char = last.len() + 1,
+            1 => self.char += last.safe_len(),
+            _ => self.char = last.safe_len() + 1,
         }
-    }
-}
-
-impl Display for Token<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
     }
 }
 
@@ -352,67 +366,22 @@ impl<'a> Token<'a> {
 
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        self.as_str().len()
+        self.as_str().safe_len()
     }
 }
 
-impl<'a> Nature for Token<'a> {
-    fn affinity(&self) -> Affinity {
-        match self {
-            Token::Ident(_) | Token::Lifetime(_) | Token::Literal(_) | Token::RawIdent(_) => {
-                Affinity::Repel
-            }
-            Token::RangeInclusive
-            | Token::VariadicArgs
-            | Token::Range
-            | Token::PathSeparator
-            | Token::ParameterArrow
-            | Token::FatArrow
-            | Token::EqualCheck
-            | Token::NotEqual
-            | Token::LessThanEq
-            | Token::GreaterThanEq
-            | Token::BooleanAnd
-            | Token::BooleanOr
-            | Token::ShiftRightAssign
-            | Token::ShiftLeftAssign
-            | Token::ShiftRight
-            | Token::ShiftLeft
-            | Token::AddAssign
-            | Token::SubAssign
-            | Token::MulAssign
-            | Token::DivAssign
-            | Token::ModAssign
-            | Token::XorAssign
-            | Token::AndAssign
-            | Token::OrAssign
-            | Token::OpenParen
-            | Token::CloseParen
-            | Token::OpenBrace
-            | Token::CloseBrace
-            | Token::OpenBracket
-            | Token::CloseBracket
-            | Token::Colon
-            | Token::Semi
-            | Token::Comma
-            | Token::Dot
-            | Token::At
-            | Token::Pound
-            | Token::Tilde
-            | Token::Question
-            | Token::Dollar
-            | Token::Eq
-            | Token::Not
-            | Token::LessThan
-            | Token::GreatherThan
-            | Token::Minus
-            | Token::And
-            | Token::Or
-            | Token::Plus
-            | Token::Star
-            | Token::Slash
-            | Token::Caret
-            | Token::Percent => Affinity::Tight,
-        }
+impl Display for Token<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+trait SafeLen {
+    fn safe_len(&self) -> usize;
+}
+
+impl SafeLen for &str {
+    fn safe_len(&self) -> usize {
+        self.chars().count()
     }
 }

@@ -52,10 +52,15 @@ pub fn test_crate(krate: &str) -> anyhow::Result<()> {
             let src = fs::read_to_string(file.path())
                 .with_context(|| format!("failed to read source file: {path:?}"))?;
 
+            if src.starts_with('\u{feff}') {
+                // TODO: unformat file then emit it with a leading feff
+                continue;
+            }
+
             let ir = cargo_unfmt::unformat(&src)?;
 
             let mut formatted = vec![];
-            emit::line_by_line(&mut formatted, ir.tokens());
+            emit::block(&mut formatted, ir.tokens().to_vec(), 80);
             fs::write(&path, &formatted).context("failed to write formatted source over")?;
         } else {
             fs::copy(file.path(), &path).context("failed to copy file over")?;

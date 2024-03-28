@@ -1,19 +1,18 @@
-use anyhow::Context;
-use cargo_unfmt::{ir::Ir, location::StmtVisitor};
+use cargo_unfmt::emit;
 use syn::visit::Visit;
 
 fn main() -> anyhow::Result<()> {
     let src = include_str!("../test_files/short-rust-file.rs");
-    let tokens = cargo_unfmt::lex::lex_file(src).context("failed to tokenize")?;
-    println!("{tokens:?}");
 
-    let ir = Ir::new(tokens.into_iter());
+    let mut vis = cargo_unfmt::location::StmtVisitor::new();
+    vis.visit_file(&syn::parse_file(src).unwrap());
+    println!("{:?}", vis.regions());
 
-    let mut stmts = StmtVisitor::new();
-    stmts.visit_file(&syn::parse_file(src).unwrap());
-    println!("{stmts:?}");
+    let uf = cargo_unfmt::unformat(src).unwrap();
 
-    let with_junk = ir.populate_junk(stmts.regions());
-    println!("{with_junk:?}");
+    let mut bytes = vec![];
+    emit::block(&mut bytes, uf.tokens().to_vec(), 80);
+
+    println!("{}", String::from_utf8(bytes).unwrap());
     Ok(())
 }

@@ -4,7 +4,7 @@ use syn::visit::Visit;
 fn main() -> anyhow::Result<()> {
     let src = include_str!("../test_files/short-rust-file.rs");
 
-    let mut vis = cargo_unfmt::location::StmtVisitor::new();
+    let mut vis = cargo_unfmt::location::Visitor::new();
     vis.visit_file(&syn::parse_file(src).unwrap());
     println!("{:?}", vis.regions());
 

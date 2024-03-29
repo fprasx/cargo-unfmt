@@ -8,21 +8,21 @@ use syn::{
 };
 
 #[derive(Debug, Default)]
-pub struct StmtVisitor {
-    regions: Vec<lex::Spanned<StatementPos>>,
+pub struct Visitor {
+    events: Vec<lex::Spanned<Event>>,
 }
 
-impl StmtVisitor {
+impl Visitor {
     pub fn new() -> Self {
-        Self { regions: vec![] }
+        Self { events: vec![] }
     }
 
-    pub fn regions(&self) -> &[lex::Spanned<StatementPos>] {
-        self.regions.as_slice()
+    pub fn regions(&self) -> &[lex::Spanned<Event>] {
+        self.events.as_slice()
     }
 }
 
-impl Visit<'_> for StmtVisitor {
+impl Visit<'_> for Visitor {
     fn visit_stmt(&mut self, i: &'_ syn::Stmt) {
         if let Stmt::Expr(_, None)
         | Stmt::Macro(StmtMacro {
@@ -35,21 +35,25 @@ impl Visit<'_> for StmtVisitor {
         } else {
             // Output statement start/begins in DFS order
             let (start, end) = endpoints(i.to_token_stream());
-            self.regions.push(start);
+            self.events.push(start);
             // Keep recursing using default visitor
             visit::visit_stmt(self, i);
-            self.regions.push(end);
+            self.events.push(end);
         }
+    }
+
+    fn visit_expr(&mut self, i: &'_ syn::Expr) {
+        visit::visit_expr(self, i);
     }
 }
 
 #[derive(Debug)]
-pub enum StatementPos {
-    Before,
-    After,
+pub enum Event {
+    StatementStart,
+    StatementEnd,
 }
 
-pub fn endpoints(t: TokenStream) -> (lex::Spanned<StatementPos>, lex::Spanned<StatementPos>) {
+pub fn endpoints(t: TokenStream) -> (lex::Spanned<Event>, lex::Spanned<Event>) {
     let tokens = t.into_iter().collect::<Vec<_>>();
 
     let TokenStart {
@@ -73,7 +77,7 @@ pub fn endpoints(t: TokenStream) -> (lex::Spanned<StatementPos>, lex::Spanned<St
     });
 
     (
-        lex::Spanned::new(StatementPos::Before, start_line, start_char),
-        lex::Spanned::new(StatementPos::After, end_line, end_char),
+        lex::Spanned::new(Event::StatementStart, start_line, start_char),
+        lex::Spanned::new(Event::StatementEnd, end_line, end_char),
     )
 }

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::{
     lex::{Spanned, Token},
-    location::StatementPos,
+    location::Event,
     JUNK,
 };
 
@@ -109,7 +109,7 @@ impl<'a> Ir<'a> {
     }
 
     /// Add junk tokens where legal.
-    pub fn populate_junk(&self, mut stmts: &[Spanned<StatementPos>]) -> Ir<'a> {
+    pub fn populate_junk(&self, mut stmts: &[Spanned<Event>]) -> Ir<'a> {
         let mut out = vec![];
         let tokens = self.tokens.iter().cloned().peekable();
 
@@ -124,11 +124,11 @@ impl<'a> Ir<'a> {
                     if let Some(junk) = stmts.first() {
                         if inner.aligns_with(junk) {
                             match junk.inner {
-                                StatementPos::Before => {
+                                Event::StatementStart => {
                                     out.push(RichToken::Junk(0));
                                     out.push(token);
                                 }
-                                StatementPos::After => {
+                                Event::StatementEnd => {
                                     out.push(token);
                                     out.push(RichToken::Junk(0));
                                 }

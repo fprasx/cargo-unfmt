@@ -134,11 +134,20 @@ fn adjust_exprs(block: &mut Vec<RichToken>, width: usize) {
     }
 
     let diff = width - len;
-    let mut added = 0;
-    // Try to get to diff - 1, as we can only add an even number of tokens. So
-    // 79/80 is good enough.
-    while added < diff.saturating_sub(1) {
-        let (fst, snd) = exprs.first().unwrap();
+
+    if diff % 2 == 0 {
+        adjust_exprs_by(block, diff, &exprs)
+    } else {
+        // Difference is odd, and we can only add an even number of characters.
+        // Leace space for an end of line comment
+        adjust_exprs_by(block, diff.saturating_sub(3), &exprs);
+    }
+}
+
+/// Adjust exprs to add `n` characters.
+fn adjust_exprs_by(block: &mut Vec<RichToken>, n: usize, exprs: &[(usize, usize)]) {
+    for expr in exprs.iter().cycle().take(n / 2) {
+        let (fst, snd) = expr;
         if let RichToken::ExprOpen { reps, .. } = block.get_mut(*fst).unwrap() {
             *reps += 1;
         } else {
@@ -152,6 +161,6 @@ fn adjust_exprs(block: &mut Vec<RichToken>, width: usize) {
                 block.get_mut(*snd)
             )
         }
-        added += 2;
+
     }
 }

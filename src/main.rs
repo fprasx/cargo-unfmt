@@ -13,7 +13,7 @@ fn main() -> anyhow::Result<()> {
     let uf = cargo_unfmt::unformat(src).unwrap();
 
     let mut bytes = vec![];
-    emit::block(&mut bytes, uf.tokens().to_vec(), 80);
+    emit::block(&mut bytes, &uf, 80);
 
     println!("{}", String::from_utf8(bytes).unwrap());
     Ok(())

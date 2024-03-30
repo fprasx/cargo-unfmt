@@ -5,6 +5,18 @@ use std::{fs, path::Path};
 use anyhow::Context;
 use walkdir::WalkDir;
 
+/// Remove doc comments heuristically. Necessary because syn doesn't understand them
+/// as comments, mand treats them as expressions.
+fn remove_doc_comments(src: &str) -> String {
+    let mut out = vec![];
+    for line in src.lines() {
+        if !line.trim_start().starts_with("///") {
+            out.push(line)
+        }
+    }
+    out.join("\n")
+}
+
 pub fn test_crate(krate: &str) -> anyhow::Result<()> {
     let input_dir = format!("/Users/fpx/code/rust/cargo-unfmt/test_crates/input/{krate}");
     let input_dir = Path::new(&input_dir);
@@ -53,6 +65,8 @@ pub fn test_crate(krate: &str) -> anyhow::Result<()> {
             let src = fs::read_to_string(file.path())
                 .with_context(|| format!("failed to read source file: {path:?}"))?;
 
+            let src = remove_doc_comments(&src);
+
             if src.starts_with('\u{feff}') {
                 // TODO: unformat file then emit it with a leading feff
                 continue;
@@ -61,7 +75,7 @@ pub fn test_crate(krate: &str) -> anyhow::Result<()> {
             let ir = cargo_unfmt::unformat(&src)?;
 
             let mut formatted = vec![];
-            emit::block(&mut formatted, ir.tokens().to_vec(), 80);
+            emit::block(&mut formatted, &ir, 80);
             fs::write(&path, &formatted).context("failed to write formatted source over")?;
         } else {
             fs::copy(file.path(), &path).context("failed to copy file over")?;

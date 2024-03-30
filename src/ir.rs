@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::borrow::Cow;
 
 use crate::{
     lex::{Spanned, Token},
@@ -46,8 +46,8 @@ impl<'a> RichToken<'a> {
             RichToken::Token(token) => Cow::Borrowed(token.inner.as_str().as_bytes()),
             RichToken::EndOfLineComment => Cow::Borrowed("//".as_bytes()),
             RichToken::Comment => Cow::Borrowed("/**/".as_bytes()),
-            RichToken::ExprOpen { reps, .. } => Cow::Owned(b"((".repeat(*reps)),
-            RichToken::ExprClose { reps, .. } => Cow::Owned(b"))".repeat(*reps)),
+            RichToken::ExprOpen { reps, .. } => Cow::Owned(b"(".repeat(*reps)),
+            RichToken::ExprClose { reps, .. } => Cow::Owned(b")".repeat(*reps)),
         }
     }
 
@@ -59,8 +59,8 @@ impl<'a> RichToken<'a> {
             RichToken::Token(token) => Cow::Borrowed(token.inner.as_str()),
             RichToken::EndOfLineComment => Cow::Borrowed("//"),
             RichToken::Comment => Cow::Borrowed("/**/"),
-            RichToken::ExprOpen { reps, .. } => Cow::Owned("((".repeat(*reps)),
-            RichToken::ExprClose { reps, .. } => Cow::Owned("))".repeat(*reps)),
+            RichToken::ExprOpen { reps, .. } => Cow::Owned("(".repeat(*reps)),
+            RichToken::ExprClose { reps, .. } => Cow::Owned(")".repeat(*reps)),
         }
     }
 
@@ -73,10 +73,6 @@ impl<'a> RichToken<'a> {
 #[derive(Debug)]
 pub struct Ir<'a> {
     tokens: Vec<RichToken<'a>>,
-    /// Maps and expr to a pair of exprclose/exprwraps. Can be None if there was
-    /// a discrepancy between syn lexing and our lexing, causing an expropen to
-    /// be unaligned.
-    expr_index: Option<HashMap<usize, (usize, usize)>>,
 }
 
 impl<'a> Ir<'a> {
@@ -123,10 +119,7 @@ impl<'a> Ir<'a> {
             last = token.inner;
         }
 
-        Self {
-            tokens: rts,
-            expr_index: None,
-        }
+        Self { tokens: rts }
     }
 
     /// Add junk tokens where legal.
@@ -136,7 +129,6 @@ impl<'a> Ir<'a> {
         // Handling expr open/close
         let mut next_id = 0;
         let mut expr_starts = vec![];
-        let mut expr_index = HashMap::new();
 
         let tokens = self.tokens.iter().cloned();
 
@@ -154,7 +146,6 @@ impl<'a> Ir<'a> {
                 println!("unaligned: {event:?}");
                 return Ir {
                     tokens: tokens.collect(),
-                    expr_index: None,
                 };
             }
         }
@@ -184,16 +175,15 @@ impl<'a> Ir<'a> {
                             }
                             Event::ExprOpen => {
                                 let id = next_id;
-                                befores.push(RichToken::ExprOpen { id, reps: 1 });
-                                expr_starts.push((id, out.len() - 1));
+                                befores.push(RichToken::ExprOpen { id, reps: 0 });
+                                expr_starts.push(id);
                                 next_id += 1;
                             }
                             Event::ExprClose => {
-                                let (id, pos) = expr_starts
+                                let id = expr_starts
                                     .pop()
                                     .expect("expression start was already added to stack");
-                                afters.push(RichToken::ExprClose { id, reps: 1 });
-                                expr_index.insert(next_id, (pos, out.len() - 1));
+                                afters.push(RichToken::ExprClose { id, reps: 0 });
                             }
                         }
                         events = &events[1..];
@@ -206,10 +196,7 @@ impl<'a> Ir<'a> {
             }
         }
 
-        Ir {
-            tokens: out,
-            expr_index: Some(expr_index),
-        }
+        Ir { tokens: out }
     }
 
     pub fn tokens(&self) -> &[RichToken<'a>] {

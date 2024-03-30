@@ -1,6 +1,9 @@
 use std::io::Write;
 
-use crate::{ir::RichToken, JUNK};
+use crate::{
+    ir::{Ir, RichToken},
+    JUNK,
+};
 
 pub fn line_by_line(writer: &mut impl Write, tokens: &[RichToken]) {
     for token in tokens {
@@ -12,9 +15,10 @@ pub fn line_by_line(writer: &mut impl Write, tokens: &[RichToken]) {
 }
 
 /// Unformat into a rectangle
-pub fn block(writer: &mut impl Write, mut tokens: Vec<RichToken>, width: usize) {
+pub fn block(writer: &mut impl Write, ir: &Ir, width: usize) {
     let mut blocks = vec![];
 
+    let mut tokens = ir.tokens().to_vec();
     tokens.reverse();
 
     while !tokens.is_empty() {
@@ -73,8 +77,8 @@ fn adjust_block(block: &mut Vec<RichToken>, width: usize) {
     adjust_stmts(block, width);
 
     // TODO: adjust exprs
+    adjust_exprs(block, width);
     // TODO: add comments to end of line
-
 }
 
 fn adjust_stmts(block: &mut [RichToken], width: usize) {
@@ -108,5 +112,46 @@ fn adjust_stmts(block: &mut [RichToken], width: usize) {
             _ => unreachable!("we already checked this is a junk"),
         }
     }
+}
 
+fn adjust_exprs(block: &mut Vec<RichToken>, width: usize) {
+    let len = block.iter().map(|token| token.len()).sum::<usize>();
+
+    let mut exprs = vec![];
+    for (i, token) in block.iter().enumerate() {
+        if let RichToken::ExprOpen { id, .. } = token {
+            for (j, close) in block.iter().enumerate().skip(i + 1) {
+                if let RichToken::ExprClose { id: close_id, .. } = close {
+                    if id == close_id {
+                        exprs.push((i, j))
+                    }
+                }
+            }
+        }
+    }
+    if exprs.is_empty() {
+        return;
+    }
+
+    let diff = width - len;
+    let mut added = 0;
+    // Try to get to diff - 1, as we can only add an even number of tokens. So
+    // 79/80 is good enough.
+    while added < diff.saturating_sub(1) {
+        let (fst, snd) = exprs.first().unwrap();
+        if let RichToken::ExprOpen { reps, .. } = block.get_mut(*fst).unwrap() {
+            *reps += 1;
+        } else {
+            unreachable!("we already checked this is an expropen")
+        }
+        if let RichToken::ExprClose { reps, .. } = block.get_mut(*snd).unwrap() {
+            *reps += 1;
+        } else {
+            unreachable!(
+                "we already checked this is an exprclose: {:?}",
+                block.get_mut(*snd)
+            )
+        }
+        added += 2;
+    }
 }

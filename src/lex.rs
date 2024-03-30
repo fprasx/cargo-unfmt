@@ -1,5 +1,6 @@
 //! This is so jank I hope I never have to touch it again.
 
+use crate::SafeLen;
 use std::fmt::Display;
 
 use anyhow::{anyhow, Context};
@@ -373,15 +374,5 @@ impl<'a> Token<'a> {
 impl Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
-    }
-}
-
-trait SafeLen {
-    fn safe_len(&self) -> usize;
-}
-
-impl SafeLen for &str {
-    fn safe_len(&self) -> usize {
-        self.chars().count()
     }
 }

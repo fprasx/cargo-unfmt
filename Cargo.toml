@@ -10,5 +10,5 @@ anyhow = "1.0.79"
 proc-macro2 = { version = "1.0.78", features = ["span-locations"] }
 quote = "1.0.35"
 rustc_lexer = "0.1.0"
-syn = { version = "2.0.48", features = ["visit", "full"] }
+syn = { version = "2.0.48", features = ["visit", "full", "extra-traits"] }
 walkdir = "2.4.0"

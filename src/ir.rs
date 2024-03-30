@@ -1,9 +1,9 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::{
     lex::{Spanned, Token},
     location::Event,
-    JUNK,
+    SafeLen, JUNK,
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -19,6 +19,15 @@ pub enum RichToken<'a> {
     EndOfLineComment,
     // /**/
     Comment,
+
+    ExprOpen {
+        id: usize,
+        reps: usize,
+    },
+    ExprClose {
+        id: usize,
+        reps: usize,
+    },
 }
 
 impl<'a> From<Spanned<Token<'a>>> for RichToken<'a> {
@@ -29,13 +38,16 @@ impl<'a> From<Spanned<Token<'a>>> for RichToken<'a> {
 
 impl<'a> RichToken<'a> {
     pub fn as_bytes(&self) -> Cow<[u8]> {
+        // TODO: use as_str imple and as_bytes
         match self {
             RichToken::Junk(n) => Cow::Borrowed(JUNK[*n].as_bytes()),
             RichToken::Space(n) => Cow::Owned(b" ".repeat(*n)),
-            RichToken::Spacer => Cow::Borrowed(&[b' ']),
+            RichToken::Spacer => Cow::Borrowed(b" "),
             RichToken::Token(token) => Cow::Borrowed(token.inner.as_str().as_bytes()),
             RichToken::EndOfLineComment => Cow::Borrowed("//".as_bytes()),
             RichToken::Comment => Cow::Borrowed("/**/".as_bytes()),
+            RichToken::ExprOpen { reps, .. } => Cow::Owned(b"(".repeat(*reps)),
+            RichToken::ExprClose { reps, .. } => Cow::Owned(b")".repeat(*reps)),
         }
     }
 
@@ -47,12 +59,14 @@ impl<'a> RichToken<'a> {
             RichToken::Token(token) => Cow::Borrowed(token.inner.as_str()),
             RichToken::EndOfLineComment => Cow::Borrowed("//"),
             RichToken::Comment => Cow::Borrowed("/**/"),
+            RichToken::ExprOpen { reps, .. } => Cow::Owned("(".repeat(*reps)),
+            RichToken::ExprClose { reps, .. } => Cow::Owned(")".repeat(*reps)),
         }
     }
 
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        self.as_str().len()
+        self.as_str().as_ref().safe_len()
     }
 }
 
@@ -109,9 +123,38 @@ impl<'a> Ir<'a> {
     }
 
     /// Add junk tokens where legal.
-    pub fn populate_junk(&self, mut stmts: &[Spanned<Event>]) -> Ir<'a> {
+    pub fn populate_events(&self, mut events: &[Spanned<Event>]) -> Ir<'a> {
         let mut out = vec![];
-        let tokens = self.tokens.iter().cloned().peekable();
+
+        // Handling expr open/close
+        let mut next_id = 0;
+        let mut expr_starts = vec![];
+        let mut index = HashMap::new();
+
+        let tokens = self.tokens.iter().cloned();
+
+        // Check
+        for event in events {
+            let mut found = false;
+            for token in tokens.clone() {
+                match token {
+                    RichToken::Junk(_)
+                    | RichToken::Space(_)
+                    | RichToken::Spacer
+                    | RichToken::EndOfLineComment
+                    | RichToken::Comment
+                    | RichToken::ExprOpen { .. }
+                    | RichToken::ExprClose { .. } => continue,
+                    RichToken::Token(inner) => found |= event.aligns_with(&inner),
+                }
+            }
+            if !found {
+                println!("unaligned: {event:?}");
+                return Ir {
+                    tokens: tokens.collect(),
+                };
+            }
+        }
 
         for token in tokens {
             match token {
@@ -119,29 +162,57 @@ impl<'a> Ir<'a> {
                 | RichToken::Space(_)
                 | RichToken::Spacer
                 | RichToken::EndOfLineComment
+                | RichToken::ExprOpen { .. }
+                | RichToken::ExprClose { .. }
                 | RichToken::Comment => out.push(token),
                 RichToken::Token(inner) => {
-                    if let Some(junk) = stmts.first() {
-                        if inner.aligns_with(junk) {
-                            match junk.inner {
-                                Event::StatementStart => {
-                                    out.push(RichToken::Junk(0));
-                                    out.push(token);
-                                }
-                                Event::StatementEnd => {
-                                    out.push(token);
-                                    out.push(RichToken::Junk(0));
-                                }
+                    let mut added = false;
+                    let mut closes = vec![];
+                    while events
+                        .first()
+                        .is_some_and(|event| event.aligns_with(&inner))
+                    {
+                        match events.first().expect("checked this exists").inner {
+                            Event::StatementStart => {
+                                out.push(RichToken::Junk(0));
+                                out.push(token);
+                                added = true;
                             }
-                            stmts = &stmts[1..];
-                        } else {
-                            out.push(token)
+                            Event::StatementEnd => {
+                                out.push(token);
+                                out.push(RichToken::Junk(0));
+                                added = true;
+                            }
+                            Event::ExprOpen => {
+                                let id = next_id;
+                                out.push(RichToken::ExprOpen { id, reps: 1 });
+                                expr_starts.push((id, out.len() - 1));
+                                next_id += 1;
+                            }
+                            Event::ExprClose => {
+                                let (id, pos) = expr_starts
+                                    .pop()
+                                    .expect("expression start was already added to stack");
+                                closes.push(RichToken::ExprClose { id, reps: 1 });
+                                index.insert(next_id, (pos, out.len() - 1));
+                            }
                         }
-                    } else {
+                        events = &events[1..];
+                    }
+
+                    if !added {
                         out.push(token)
                     }
+                    out.extend(closes);
                 }
             }
+        }
+
+        if !events.is_empty() {
+            for event in events {
+                // println!("{event:?}")
+            }
+            panic!("")
         }
 
         Ir { tokens: out }

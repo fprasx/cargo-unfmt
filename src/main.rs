@@ -6,7 +6,9 @@ fn main() -> anyhow::Result<()> {
 
     let mut vis = cargo_unfmt::location::Visitor::new();
     vis.visit_file(&syn::parse_file(src).unwrap());
-    println!("{:?}", vis.regions());
+    for region in vis.regions() {
+        println!("{region:?}")
+    }
 
     let uf = cargo_unfmt::unformat(src).unwrap();
 

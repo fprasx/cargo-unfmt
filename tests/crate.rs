@@ -49,6 +49,7 @@ pub fn test_crate(krate: &str) -> anyhow::Result<()> {
         fs::File::create(&path).with_context(|| format!("failed to create new file {path:?}"))?;
 
         if path.extension().is_some_and(|ext| ext == "rs") {
+            println!("unformatting: {path:?}");
             let src = fs::read_to_string(file.path())
                 .with_context(|| format!("failed to read source file: {path:?}"))?;
 

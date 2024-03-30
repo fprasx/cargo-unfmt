@@ -34,7 +34,18 @@ pub fn unformat(src: &str) -> anyhow::Result<Ir> {
     stmts.visit_file(&syn::parse_file(src).unwrap());
 
     let ir = Ir::new(tokens.into_iter());
-    let ir = ir.populate_junk(stmts.regions());
+    let ir = ir.populate_events(stmts.regions());
 
     Ok(ir)
+}
+
+trait SafeLen {
+    /// Returns the displayed length of a string.
+    fn safe_len(&self) -> usize;
+}
+
+impl SafeLen for &str {
+    fn safe_len(&self) -> usize {
+        self.chars().count()
+    }
 }

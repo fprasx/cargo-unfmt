@@ -166,26 +166,22 @@ impl<'a> Ir<'a> {
                 | RichToken::ExprClose { .. }
                 | RichToken::Comment => out.push(token),
                 RichToken::Token(inner) => {
-                    let mut added = false;
-                    let mut closes = vec![];
+                    let mut befores = vec![];
+                    let mut afters = vec![];
                     while events
                         .first()
                         .is_some_and(|event| event.aligns_with(&inner))
                     {
                         match events.first().expect("checked this exists").inner {
                             Event::StatementStart => {
-                                out.push(RichToken::Junk(0));
-                                out.push(token);
-                                added = true;
+                                befores.push(RichToken::Junk(0));
                             }
                             Event::StatementEnd => {
-                                out.push(token);
-                                out.push(RichToken::Junk(0));
-                                added = true;
+                                afters.push(RichToken::Junk(0));
                             }
                             Event::ExprOpen => {
                                 let id = next_id;
-                                out.push(RichToken::ExprOpen { id, reps: 1 });
+                                befores.push(RichToken::ExprOpen { id, reps: 1 });
                                 expr_starts.push((id, out.len() - 1));
                                 next_id += 1;
                             }
@@ -193,17 +189,16 @@ impl<'a> Ir<'a> {
                                 let (id, pos) = expr_starts
                                     .pop()
                                     .expect("expression start was already added to stack");
-                                closes.push(RichToken::ExprClose { id, reps: 1 });
+                                afters.push(RichToken::ExprClose { id, reps: 1 });
                                 index.insert(next_id, (pos, out.len() - 1));
                             }
                         }
                         events = &events[1..];
                     }
 
-                    if !added {
-                        out.push(token)
-                    }
-                    out.extend(closes);
+                    out.extend(befores);
+                    out.push(token);
+                    out.extend(afters);
                 }
             }
         }

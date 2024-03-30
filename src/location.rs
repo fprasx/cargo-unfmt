@@ -23,24 +23,24 @@ impl Visitor {
 }
 
 impl Visit<'_> for Visitor {
-    // fn visit_stmt(&mut self, i: &'_ syn::Stmt) {
-    //     if let Stmt::Expr(_, None)
-    //     | Stmt::Macro(StmtMacro {
-    //         semi_token: None, ..
-    //     }) = i
-    //     {
-    //         // These statements don't have a semicolon so we can't put junk after them.
-    //         // Keep recursing using default visitor
-    //         visit::visit_stmt(self, i);
-    //     } else {
-    //         // Output statement start/begins in DFS order
-    //         let (start, end) = stmt_endpoints(i);
-    //         self.events.push(start);
-    //         // Keep recursing using default visitor
-    //         visit::visit_stmt(self, i);
-    //         self.events.push(end);
-    //     }
-    // }
+    fn visit_stmt(&mut self, i: &'_ syn::Stmt) {
+        if let Stmt::Expr(_, None)
+        | Stmt::Macro(StmtMacro {
+            semi_token: None, ..
+        }) = i
+        {
+            // These statements don't have a semicolon so we can't put junk after them.
+            // Keep recursing using default visitor
+            visit::visit_stmt(self, i);
+        } else {
+            // Output statement start/begins in DFS order
+            let (start, end) = stmt_endpoints(i);
+            self.events.push(start);
+            // Keep recursing using default visitor
+            visit::visit_stmt(self, i);
+            self.events.push(end);
+        }
+    }
 
     fn visit_expr(&mut self, i: &'_ syn::Expr) {
         match i {

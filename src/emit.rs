@@ -1,9 +1,14 @@
-use std::io::Write;
+use std::{io::Write, slice::Windows};
 
 use crate::{
     ir::{Ir, RichToken},
+    lex::{Spanned, Token},
     JUNK,
 };
+
+pub fn block_len(block: &[RichToken]) -> usize {
+    block.iter().map(|token| token.len()).sum::<usize>()
+}
 
 pub fn line_by_line(writer: &mut impl Write, tokens: &[RichToken]) {
     for token in tokens {
@@ -21,6 +26,9 @@ pub fn block(writer: &mut impl Write, ir: &Ir, width: usize) {
     let mut tokens = ir.tokens().to_vec();
     tokens.reverse();
 
+    // Don't exceed this point; we can always fill with a comment
+    let threshold = width - 2;
+
     while !tokens.is_empty() {
         let mut block = vec![];
         let mut len = 0;
@@ -28,13 +36,13 @@ pub fn block(writer: &mut impl Write, ir: &Ir, width: usize) {
         while let Some(token) = tokens.pop() {
             // If token itself is longer than limit, end previous line, and add
             // another line with just the token
-            if token.len() >= width {
+            if token.len() >= threshold {
                 blocks.push(block);
                 block = vec![token];
                 break;
             }
 
-            if len + token.len() < width {
+            if len + token.len() < threshold {
                 // Happy case, we can add token to line
                 block.push(token);
                 len += token.len();
@@ -73,16 +81,32 @@ fn adjust_block(block: &mut Vec<RichToken>, width: usize) {
         block.pop();
     }
 
-    // Add in junk
-    adjust_stmts(block, width);
+    // Add in junk. Don't go past width - 2 as then we can't fill with a // comment
+    adjust_stmts(block, width - 2);
 
-    // TODO: adjust exprs
+    // Add in exprs
     adjust_exprs(block, width);
-    // TODO: add comments to end of line
+
+    // Add comments to end of line
+    let len = block_len(block);
+    if len != width
+        && !matches!(
+            block.last().unwrap(),
+            RichToken::Token(Spanned {
+                inner: Token::Slash,
+                ..
+            })
+        )
+    {
+        let comment_text_len = (width - len).saturating_sub(2);
+        block.push(RichToken::EndOfLineComment(
+            JUNK[comment_text_len.min(JUNK.len() - 1)],
+        ));
+    }
 }
 
 fn adjust_stmts(block: &mut [RichToken], width: usize) {
-    let len = block.iter().map(|token| token.len()).sum::<usize>();
+    let len = block_len(block);
 
     let junks = block
         .iter()
@@ -100,7 +124,7 @@ fn adjust_stmts(block: &mut [RichToken], width: usize) {
         return;
     }
 
-    let diff = width - len;
+    let diff = width.saturating_sub(len);
     let mut added = 0;
     for junk in &junks {
         match block.get_mut(*junk).unwrap() {
@@ -115,7 +139,7 @@ fn adjust_stmts(block: &mut [RichToken], width: usize) {
 }
 
 fn adjust_exprs(block: &mut Vec<RichToken>, width: usize) {
-    let len = block.iter().map(|token| token.len()).sum::<usize>();
+    let len = block_len(block);
 
     let mut exprs = vec![];
     for (i, token) in block.iter().enumerate() {
@@ -133,7 +157,7 @@ fn adjust_exprs(block: &mut Vec<RichToken>, width: usize) {
         return;
     }
 
-    let diff = width - len;
+    let diff = width.saturating_sub(len);
 
     if diff % 2 == 0 {
         adjust_exprs_by(block, diff, &exprs)
@@ -161,6 +185,5 @@ fn adjust_exprs_by(block: &mut Vec<RichToken>, n: usize, exprs: &[(usize, usize)
                 block.get_mut(*snd)
             )
         }
-
     }
 }

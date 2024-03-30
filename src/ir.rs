@@ -6,7 +6,7 @@ use crate::{
     SafeLen, JUNK,
 };
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum RichToken<'a> {
     Junk(usize),
     Space(usize),
@@ -16,7 +16,7 @@ pub enum RichToken<'a> {
     Token(Spanned<Token<'a>>),
 
     // // at end of line
-    EndOfLineComment,
+    EndOfLineComment(&'static str),
     // /**/
     Comment,
 
@@ -44,7 +44,7 @@ impl<'a> RichToken<'a> {
             RichToken::Space(n) => Cow::Owned(b" ".repeat(*n)),
             RichToken::Spacer => Cow::Borrowed(b" "),
             RichToken::Token(token) => Cow::Borrowed(token.inner.as_str().as_bytes()),
-            RichToken::EndOfLineComment => Cow::Borrowed("//".as_bytes()),
+            RichToken::EndOfLineComment(c) => Cow::Owned(format!("//{c}").into_bytes()),
             RichToken::Comment => Cow::Borrowed("/**/".as_bytes()),
             RichToken::ExprOpen { reps, .. } => Cow::Owned(b"(".repeat(*reps)),
             RichToken::ExprClose { reps, .. } => Cow::Owned(b")".repeat(*reps)),
@@ -57,7 +57,7 @@ impl<'a> RichToken<'a> {
             RichToken::Space(n) => Cow::Owned(" ".repeat(*n)),
             RichToken::Spacer => Cow::Borrowed(" "),
             RichToken::Token(token) => Cow::Borrowed(token.inner.as_str()),
-            RichToken::EndOfLineComment => Cow::Borrowed("//"),
+            RichToken::EndOfLineComment(c) => Cow::Owned(format!("//{c}")),
             RichToken::Comment => Cow::Borrowed("/**/"),
             RichToken::ExprOpen { reps, .. } => Cow::Owned("(".repeat(*reps)),
             RichToken::ExprClose { reps, .. } => Cow::Owned(")".repeat(*reps)),
@@ -155,7 +155,7 @@ impl<'a> Ir<'a> {
                 RichToken::Junk(_)
                 | RichToken::Space(_)
                 | RichToken::Spacer
-                | RichToken::EndOfLineComment
+                | RichToken::EndOfLineComment(_)
                 | RichToken::ExprOpen { .. }
                 | RichToken::ExprClose { .. }
                 | RichToken::Comment => out.push(token),

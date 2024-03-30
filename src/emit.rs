@@ -1,4 +1,4 @@
-use std::{io::Write, slice::Windows};
+use std::io::Write;
 
 use crate::{
     ir::{Ir, RichToken},
@@ -27,8 +27,6 @@ pub fn block(writer: &mut impl Write, ir: &Ir, width: usize) {
     tokens.reverse();
 
     // Don't exceed this point; we can always fill with a comment
-    let threshold = width - 2;
-
     while !tokens.is_empty() {
         let mut block = vec![];
         let mut len = 0;
@@ -36,13 +34,13 @@ pub fn block(writer: &mut impl Write, ir: &Ir, width: usize) {
         while let Some(token) = tokens.pop() {
             // If token itself is longer than limit, end previous line, and add
             // another line with just the token
-            if token.len() >= threshold {
+            if token.len() >= width {
                 blocks.push(block);
                 block = vec![token];
                 break;
             }
 
-            if len + token.len() < threshold {
+            if len + token.len() < width {
                 // Happy case, we can add token to line
                 block.push(token);
                 len += token.len();
@@ -82,14 +80,20 @@ fn adjust_block(block: &mut Vec<RichToken>, width: usize) {
     }
 
     // Add in junk. Don't go past width - 2 as then we can't fill with a // comment
-    adjust_stmts(block, width - 2);
+    adjust_stmts(block, width);
 
     // Add in exprs
     adjust_exprs(block, width);
 
+    // If we're one away, add a space after first token
+    let len = block_len(block);
+    if len == width - 1 {
+        block.insert(1, RichToken::Spacer);
+    }
+
     // Add comments to end of line
     let len = block_len(block);
-    if len != width
+    if len < width
         && !matches!(
             block.last().unwrap(),
             RichToken::Token(Spanned {
@@ -163,8 +167,8 @@ fn adjust_exprs(block: &mut Vec<RichToken>, width: usize) {
         adjust_exprs_by(block, diff, &exprs)
     } else {
         // Difference is odd, and we can only add an even number of characters.
-        // Leace space for an end of line comment
-        adjust_exprs_by(block, diff.saturating_sub(3), &exprs);
+        // Leave space for an end of line comment
+        adjust_exprs_by(block, diff, &exprs);
     }
 }
 

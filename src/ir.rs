@@ -46,8 +46,8 @@ impl<'a> RichToken<'a> {
             RichToken::Token(token) => Cow::Borrowed(token.inner.as_str().as_bytes()),
             RichToken::EndOfLineComment => Cow::Borrowed("//".as_bytes()),
             RichToken::Comment => Cow::Borrowed("/**/".as_bytes()),
-            RichToken::ExprOpen { reps, .. } => Cow::Owned(b"(".repeat(*reps)),
-            RichToken::ExprClose { reps, .. } => Cow::Owned(b")".repeat(*reps)),
+            RichToken::ExprOpen { reps, .. } => Cow::Owned(b"((".repeat(*reps)),
+            RichToken::ExprClose { reps, .. } => Cow::Owned(b"))".repeat(*reps)),
         }
     }
 
@@ -59,8 +59,8 @@ impl<'a> RichToken<'a> {
             RichToken::Token(token) => Cow::Borrowed(token.inner.as_str()),
             RichToken::EndOfLineComment => Cow::Borrowed("//"),
             RichToken::Comment => Cow::Borrowed("/**/"),
-            RichToken::ExprOpen { reps, .. } => Cow::Owned("(".repeat(*reps)),
-            RichToken::ExprClose { reps, .. } => Cow::Owned(")".repeat(*reps)),
+            RichToken::ExprOpen { reps, .. } => Cow::Owned("((".repeat(*reps)),
+            RichToken::ExprClose { reps, .. } => Cow::Owned("))".repeat(*reps)),
         }
     }
 
@@ -137,15 +137,10 @@ impl<'a> Ir<'a> {
         for event in events {
             let mut found = false;
             for token in tokens.clone() {
-                match token {
-                    RichToken::Junk(_)
-                    | RichToken::Space(_)
-                    | RichToken::Spacer
-                    | RichToken::EndOfLineComment
-                    | RichToken::Comment
-                    | RichToken::ExprOpen { .. }
-                    | RichToken::ExprClose { .. } => continue,
-                    RichToken::Token(inner) => found |= event.aligns_with(&inner),
+                if let RichToken::Token(inner) = token {
+                    found |= event.aligns_with(&inner)
+                } else {
+                    continue;
                 }
             }
             if !found {
@@ -201,13 +196,6 @@ impl<'a> Ir<'a> {
                     out.extend(afters);
                 }
             }
-        }
-
-        if !events.is_empty() {
-            for event in events {
-                // println!("{event:?}")
-            }
-            panic!("")
         }
 
         Ir { tokens: out }

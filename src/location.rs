@@ -4,7 +4,7 @@ use proc_macro2::TokenTree;
 use quote::ToTokens;
 use syn::{
     visit::{self, Visit},
-    PatPath, Stmt, StmtMacro,
+    Stmt, StmtMacro,
 };
 
 #[derive(Debug, Default)]
@@ -72,33 +72,21 @@ impl Visit<'_> for Visitor {
                 self.events.push(end);
             },
             syn::Expr::Lit(_)  => {
-                // syn doesn't understand doc comments
+                // syn doesn't understand doc comments, so they appear as expressions
+                // starting at character 1
                 let (start, end) = expr_endpoints(i);
                 if start.region.char == 1 {
                     visit::visit_expr(self, i);
                 } else {
-                self.events.push(start);
-                visit::visit_expr(self, i);
-                self.events.push(end);
-
+                    self.events.push(start);
+                    visit::visit_expr(self, i);
+                    self.events.push(end);
                 }
             },
-            // A path of length one is just and identifier
-            // ACTUALLY: can't do these because of struct initers, ex.
+            // A path of length 1 is just an identifier, however these cannot
+            // always be wrapped in parentheses because of struct initalizers:
             // X { a, b } cannot be converted to X { (a), (b) }
-            // syn::Expr::Path(syn::ExprPath {
-            //     path: syn::Path {
-            //         segments,
-            //         ..
-            //     },
-            //     ..
-            // }) if segments.len() == 1 => {
-            //     let (start, end) = expr_endpoints(i);
-            //     self.events.push(start);
-            //     visit::visit_expr(self, i);
-            //     self.events.push(end);
-            // }
-
+            // Other paths of length greater than 1 cannot be wrapped either
             syn::Expr::Path(_)
             | syn::Expr::Block(_)
             | syn::Expr::Group(_) // not sure what this is

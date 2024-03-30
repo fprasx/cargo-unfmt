@@ -61,6 +61,23 @@ pub fn block(writer: &mut impl Write, mut tokens: Vec<RichToken>, width: usize) 
 
 /// Adjust a block to as close to width characters as possible
 fn adjust_block(block: &mut Vec<RichToken>, width: usize) {
+    // Remove leading and trailing spacers
+    while let Some(RichToken::Spacer) = block.first() {
+        block.remove(0);
+    }
+    while let Some(RichToken::Spacer) = block.last() {
+        block.pop();
+    }
+
+    // Add in junk
+    adjust_stmts(block, width);
+
+    // TODO: adjust exprs
+    // TODO: add comments to end of line
+
+}
+
+fn adjust_stmts(block: &mut [RichToken], width: usize) {
     let len = block.iter().map(|token| token.len()).sum::<usize>();
 
     let junks = block
@@ -91,4 +108,5 @@ fn adjust_block(block: &mut Vec<RichToken>, width: usize) {
             _ => unreachable!("we already checked this is a junk"),
         }
     }
+
 }

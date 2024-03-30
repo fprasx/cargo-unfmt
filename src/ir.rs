@@ -73,6 +73,10 @@ impl<'a> RichToken<'a> {
 #[derive(Debug)]
 pub struct Ir<'a> {
     tokens: Vec<RichToken<'a>>,
+    /// Maps and expr to a pair of exprclose/exprwraps. Can be None if there was
+    /// a discrepancy between syn lexing and our lexing, causing an expropen to
+    /// be unaligned.
+    expr_index: Option<HashMap<usize, (usize, usize)>>,
 }
 
 impl<'a> Ir<'a> {
@@ -119,7 +123,10 @@ impl<'a> Ir<'a> {
             last = token.inner;
         }
 
-        Self { tokens: rts }
+        Self {
+            tokens: rts,
+            expr_index: None,
+        }
     }
 
     /// Add junk tokens where legal.
@@ -129,7 +136,7 @@ impl<'a> Ir<'a> {
         // Handling expr open/close
         let mut next_id = 0;
         let mut expr_starts = vec![];
-        let mut index = HashMap::new();
+        let mut expr_index = HashMap::new();
 
         let tokens = self.tokens.iter().cloned();
 
@@ -147,6 +154,7 @@ impl<'a> Ir<'a> {
                 println!("unaligned: {event:?}");
                 return Ir {
                     tokens: tokens.collect(),
+                    expr_index: None,
                 };
             }
         }
@@ -185,7 +193,7 @@ impl<'a> Ir<'a> {
                                     .pop()
                                     .expect("expression start was already added to stack");
                                 afters.push(RichToken::ExprClose { id, reps: 1 });
-                                index.insert(next_id, (pos, out.len() - 1));
+                                expr_index.insert(next_id, (pos, out.len() - 1));
                             }
                         }
                         events = &events[1..];
@@ -198,7 +206,10 @@ impl<'a> Ir<'a> {
             }
         }
 
-        Ir { tokens: out }
+        Ir {
+            tokens: out,
+            expr_index: Some(expr_index),
+        }
     }
 
     pub fn tokens(&self) -> &[RichToken<'a>] {

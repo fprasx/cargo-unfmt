@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use anyhow::Context;
 use ir::Ir;
 use location::Visitor;
@@ -93,16 +95,33 @@ const JUNK: [&str; 81] = [
     "if true{};if true{};if true{};if true{};if true{};if true{};if true{};if true{};",
 ];
 
-pub fn unformat(src: &str) -> anyhow::Result<Ir> {
-    let tokens = lex::lex_file(src).context("source was not valid")?;
+pub fn unformat(src: &str, width: usize) -> anyhow::Result<Vec<u8>> {
+    let src = remove_doc_comments(src);
+
+    let tokens = lex::lex_file(&src).context("source was not valid")?;
 
     let mut stmts = Visitor::new();
-    stmts.visit_file(&syn::parse_file(src).unwrap());
+    stmts.visit_file(&syn::parse_file(&src).unwrap());
 
     let ir = Ir::new(tokens.into_iter());
     let ir = ir.populate_events(stmts.regions());
 
-    Ok(ir)
+    let mut unformatted = vec![];
+    crate::emit::block(&mut unformatted, &ir, width);
+
+    Ok(unformatted)
+}
+
+/// Remove doc comments heuristically. Necessary because syn doesn't understand them
+/// as comments, mand treats them as expressions.
+fn remove_doc_comments(src: &str) -> String {
+    let mut out = vec![];
+    for line in src.lines() {
+        if !line.trim_start().starts_with("///") {
+            out.push(line)
+        }
+    }
+    out.join("\n")
 }
 
 trait SafeLen {

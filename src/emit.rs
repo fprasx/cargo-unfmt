@@ -93,19 +93,28 @@ fn adjust_block(block: &mut Vec<RichToken>, width: usize) {
 
     // Add comments to end of line
     let len = block_len(block);
-    if len < width
-        && !matches!(
-            block.last().unwrap(),
-            RichToken::Token(Spanned {
-                inner: Token::Slash,
-                ..
-            })
-        )
-    {
+    if len < width && !ends_in_slash(block) {
         let comment_text_len = (width - len).saturating_sub(2);
         block.push(RichToken::EndOfLineComment(
             JUNK[comment_text_len.min(JUNK.len() - 1)],
         ));
+    }
+}
+
+fn ends_in_slash(block: &[RichToken]) -> bool {
+    let mut i = block.len() - 1;
+    // Ignore control tokens
+    while i > 0 && !matches!(block.get(i).unwrap(), RichToken::Token(_)) {
+        i -= 1;
+    }
+    is_slash(block.get(i).unwrap())
+}
+
+fn is_slash(token: &RichToken) -> bool {
+    if let RichToken::Token(token) = token {
+        matches!(token.inner, Token::Slash)
+    } else {
+        false
     }
 }
 

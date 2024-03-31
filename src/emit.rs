@@ -129,15 +129,16 @@ fn adjust_stmts(block: &mut [RichToken], width: usize) {
     }
 
     let diff = width.saturating_sub(len);
-    let mut added = 0;
-    for junk in &junks {
-        match block.get_mut(*junk).unwrap() {
-            RichToken::Junk(n) => {
-                let addition = (diff - added).min(JUNK.len() - 1 - *n);
-                *n += addition;
-                added += addition;
-            }
-            _ => unreachable!("we already checked this is a junk"),
+    adjust_stmts_by(block, diff, &junks);
+}
+
+fn adjust_stmts_by(block: &mut [RichToken], n: usize, junks: &[usize]) {
+    for junk in junks.iter().cycle().take(n) {
+        if let RichToken::Junk(n) = block.get_mut(*junk).unwrap() {
+            *n += 1;
+
+        } else {
+            panic!("we already checked this is a junk")
         }
     }
 }
@@ -179,12 +180,12 @@ fn adjust_exprs_by(block: &mut Vec<RichToken>, n: usize, exprs: &[(usize, usize)
         if let RichToken::ExprOpen { reps, .. } = block.get_mut(*fst).unwrap() {
             *reps += 1;
         } else {
-            unreachable!("we already checked this is an expropen")
+            panic!("we already checked this is an expropen")
         }
         if let RichToken::ExprClose { reps, .. } = block.get_mut(*snd).unwrap() {
             *reps += 1;
         } else {
-            unreachable!(
+            panic!(
                 "we already checked this is an exprclose: {:?}",
                 block.get_mut(*snd)
             )

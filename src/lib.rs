@@ -103,7 +103,7 @@ const JUNK: [&str; 81] = [
 /// Returns an error if the source file is not valid Rust.
 ///
 /// This function returns a spurious error if source has documentation comments
-/// not at the start of a line, for example
+/// not at the start of a line, for example:
 /// ```
 /// let x = blah; /// bad!
 /// ```

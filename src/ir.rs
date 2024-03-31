@@ -104,9 +104,24 @@ impl<'a> Ir<'a> {
                     rts.push(RichToken::Spacer);
                     rts.push(RichToken::Token(token));
                 }
+                // < and < combine to form << (can happen in macro)
+                (Token::LessThan, Token::LessThan)
+                // > and => combine to form >=> (can happen in macro)
+                // Same thing can happen with +, *, ?
+                | (Token::GreatherThan | Token::Plus|Token::Star|Token::Question, Token::FatArrow)
+                    => {
+                    rts.push(RichToken::Spacer);
+                    rts.push(RichToken::Token(token));
+                }
                 (
                     Token::Ident(_) | Token::RawIdent(_) | Token::Literal(_) | Token::Lifetime(_),
-                    Token::Ident(_) | Token::RawIdent(_) | Token::Literal(_) | Token::Lifetime(_),
+                    Token::Ident(_)
+                    | Token::RawIdent(_)
+                    | Token::Literal(_)
+                    | Token::Lifetime(_)
+                    // ident # cannot become ident# because then ident looks like
+                    // a prefix to some sort of literal
+                    | Token::Pound,
                 ) => {
                     rts.push(RichToken::Spacer);
                     rts.push(RichToken::Token(token));

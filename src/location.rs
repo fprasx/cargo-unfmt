@@ -110,7 +110,7 @@ impl Visit<'_> for Visitor {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Event {
     StatementStart,
     StatementEnd,

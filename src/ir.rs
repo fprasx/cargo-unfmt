@@ -138,7 +138,9 @@ impl<'a> Ir<'a> {
 
         let tokens = self.tokens.iter().cloned();
 
-        // Check
+        // Check for unaligned tokens. This can happen because of how syn parses
+        // ranges. In this case we just ignore expropen/close and just go by
+        // junk.
         for event in events {
             let mut found = false;
             for token in tokens.clone() {
@@ -149,10 +151,16 @@ impl<'a> Ir<'a> {
                 }
             }
             if !found {
-                println!("unaligned: {event:?}");
-                return Ir {
-                    tokens: tokens.collect(),
-                };
+                return self.populate_events(
+                    events
+                        .iter()
+                        .copied()
+                        .filter(|event| {
+                            matches!(event.inner, Event::StatementStart | Event::StatementEnd)
+                        })
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                );
             }
         }
 

@@ -96,13 +96,13 @@ fn main() -> anyhow::Result<()> {
                         fs::write(path, &unformatted_with_bom)
                             .context("failed to write formatted source over")?
                     }
-                    Err(e) => eprintln!("[cargo-unfmt] error: {e}"),
+                    Err(e) => eprintln!("[cargo-unfmt] error on {path:?}: {e}"),
                 }
             } else {
                 match cargo_unfmt::unformat(&src, *width) {
                     Ok(unformatted) => fs::write(path, &unformatted)
                         .context("failed to write formatted source over")?,
-                    Err(e) => eprintln!("[cargo-unfmt] error: {e}"),
+                    Err(e) => eprintln!("[cargo-unfmt] error on {path:?}: {e}"),
                 }
             }
         }

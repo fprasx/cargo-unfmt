@@ -4,6 +4,7 @@ authors = ["Felix Prasanna <fpx@mit.edu>"]
 description = "unformat code into perfect rectangles"
 repository = "https://github.com/fprasx/cargo-unfmt"
 documentation = "https://docs.rs/cargo-unfmt"
+license = "GPL-3.0-or-later"
 version = "0.1.0"
 edition = "2021"
 

@@ -9,17 +9,12 @@ use crate::{
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum RichToken<'a> {
     Junk(usize),
-    Space(usize),
     /// Guaranteed space that separates two tokens can't fuse
     /// ex. - and > can't fuse as they would form a ->
     Spacer,
     Token(Spanned<Token<'a>>),
-
     // // at end of line
     EndOfLineComment(&'static str),
-    // /**/
-    Comment,
-
     ExprOpen {
         id: usize,
         reps: usize,
@@ -41,11 +36,9 @@ impl<'a> RichToken<'a> {
         // TODO: use as_str imple and as_bytes
         match self {
             RichToken::Junk(n) => Cow::Borrowed(JUNK[*n].as_bytes()),
-            RichToken::Space(n) => Cow::Owned(b" ".repeat(*n)),
             RichToken::Spacer => Cow::Borrowed(b" "),
             RichToken::Token(token) => Cow::Borrowed(token.inner.as_str().as_bytes()),
             RichToken::EndOfLineComment(c) => Cow::Owned(format!("//{c}").into_bytes()),
-            RichToken::Comment => Cow::Borrowed("/**/".as_bytes()),
             RichToken::ExprOpen { reps, .. } => Cow::Owned(b"(".repeat(*reps)),
             RichToken::ExprClose { reps, .. } => Cow::Owned(b")".repeat(*reps)),
         }
@@ -54,11 +47,9 @@ impl<'a> RichToken<'a> {
     pub fn as_str(&self) -> Cow<str> {
         match self {
             RichToken::Junk(n) => Cow::Borrowed(JUNK[*n]),
-            RichToken::Space(n) => Cow::Owned(" ".repeat(*n)),
             RichToken::Spacer => Cow::Borrowed(" "),
             RichToken::Token(token) => Cow::Borrowed(token.inner.as_str()),
             RichToken::EndOfLineComment(c) => Cow::Owned(format!("//{c}")),
-            RichToken::Comment => Cow::Borrowed("/**/"),
             RichToken::ExprOpen { reps, .. } => Cow::Owned("(".repeat(*reps)),
             RichToken::ExprClose { reps, .. } => Cow::Owned(")".repeat(*reps)),
         }
@@ -137,7 +128,7 @@ impl<'a> Ir<'a> {
         Self { tokens: rts }
     }
 
-    /// Add junk tokens where legal.
+    /// Add in junk/expr tokens where needed.
     pub fn populate_events(&self, mut events: &[Spanned<Event>]) -> Ir<'a> {
         let mut out = vec![];
 
@@ -168,12 +159,10 @@ impl<'a> Ir<'a> {
         for token in tokens {
             match token {
                 RichToken::Junk(_)
-                | RichToken::Space(_)
                 | RichToken::Spacer
                 | RichToken::EndOfLineComment(_)
                 | RichToken::ExprOpen { .. }
-                | RichToken::ExprClose { .. }
-                | RichToken::Comment => out.push(token),
+                | RichToken::ExprClose { .. } => out.push(token),
                 RichToken::Token(inner) => {
                     let mut befores = vec![];
                     let mut afters = vec![];

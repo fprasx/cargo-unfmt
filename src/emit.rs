@@ -6,17 +6,8 @@ use crate::{
     JUNK,
 };
 
-pub fn block_len(block: &[RichToken]) -> usize {
+fn block_len(block: &[RichToken]) -> usize {
     block.iter().map(|token| token.len()).sum::<usize>()
-}
-
-pub fn line_by_line(writer: &mut impl Write, tokens: &[RichToken]) {
-    for token in tokens {
-        let bytes = token.as_bytes();
-        writer.write_all(&bytes).unwrap();
-        writer.write_all(&[b'\n']).unwrap();
-    }
-    writer.flush().unwrap();
 }
 
 /// Unformat into a rectangle

@@ -3,11 +3,11 @@ use ir::Ir;
 use location::Visitor;
 use syn::visit::Visit;
 
-pub mod location;
+mod location;
 
-pub mod emit;
-pub mod ir;
-pub mod lex;
+mod emit;
+mod ir;
+mod lex;
 
 const JUNK: [&str; 81] = [
     "",
@@ -93,6 +93,21 @@ const JUNK: [&str; 81] = [
     "if true{};if true{};if true{};if true{};if true{};if true{};if true{};if true{};",
 ];
 
+/// Unformat a soruce file into lines of length `width`.
+///
+/// ## Details
+/// This process strips comments, inserts no-op statements, and wraps expressions
+/// in extra parentheses to achieve the desired line length.
+///
+/// ## Errors
+/// Returns an error if the source file is not valid Rust.
+///
+/// This function returns a spurious error if source has documentation comments
+/// not at the start of a line, for example
+/// ```
+/// let x = blah; /// bad!
+/// ```
+/// This is because we use syn under the hood, which does not understand doc comments.
 pub fn unformat(src: &str, width: usize) -> anyhow::Result<Vec<u8>> {
     let src = remove_doc_comments(src);
 
@@ -102,7 +117,7 @@ pub fn unformat(src: &str, width: usize) -> anyhow::Result<Vec<u8>> {
     stmts.visit_file(&syn::parse_file(&src).unwrap());
 
     let ir = Ir::new(tokens.into_iter());
-    let ir = ir.populate_events(stmts.regions());
+    let ir = ir.populate_events(stmts.events());
 
     let mut unformatted = vec![];
     crate::emit::block(&mut unformatted, &ir, width);

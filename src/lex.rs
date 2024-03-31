@@ -8,7 +8,7 @@ use proc_macro2::{LineColumn, Span};
 use rustc_lexer::TokenKind;
 
 // The default display for syn errors is extremely minimal.
-pub fn display_syn_error(e: syn::Error) -> String {
+fn display_syn_error(e: syn::Error) -> String {
     format!("error @ {:?}: {e}", e.span().start())
 }
 
@@ -50,10 +50,6 @@ impl<T> Spanned<T> {
     pub fn new(inner: T, line: usize, char: usize) -> Self {
         let region = TokenStart { line, char };
         Self { inner, region }
-    }
-
-    pub fn into_inner(self) -> T {
-        self.inner
     }
 }
 
@@ -184,7 +180,7 @@ impl Lexer {
     /// Lexes textual tokens such as indentifiers.
     ///
     /// Returns `Some((None, src))` if the next token is a comment or whitespace.
-    pub fn lex_textual_token<'src>(
+    fn lex_textual_token<'src>(
         &mut self,
         src: &'src str,
     ) -> Option<(Option<Spanned<Token<'src>>>, &'src str)> {
@@ -363,11 +359,6 @@ impl<'a> Token<'a> {
             Token::Caret => "^",
             Token::Percent => "%",
         }
-    }
-
-    #[allow(clippy::len_without_is_empty)]
-    pub fn len(&self) -> usize {
-        self.as_str().safe_len()
     }
 }
 

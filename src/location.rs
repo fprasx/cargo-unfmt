@@ -17,7 +17,7 @@ impl Visitor {
         Self { events: vec![] }
     }
 
-    pub fn regions(&self) -> &[lex::Spanned<Event>] {
+    pub fn events(&self) -> &[lex::Spanned<Event>] {
         self.events.as_slice()
     }
 }
@@ -118,7 +118,7 @@ pub enum Event {
     ExprClose,
 }
 
-pub fn stmt_endpoints(stmt: &syn::Stmt) -> (lex::Spanned<Event>, lex::Spanned<Event>) {
+fn stmt_endpoints(stmt: &syn::Stmt) -> (lex::Spanned<Event>, lex::Spanned<Event>) {
     let tokens = stmt.to_token_stream().into_iter().collect::<Vec<_>>();
 
     let TokenStart {
@@ -147,7 +147,7 @@ pub fn stmt_endpoints(stmt: &syn::Stmt) -> (lex::Spanned<Event>, lex::Spanned<Ev
     )
 }
 
-pub fn expr_endpoints(stmt: &syn::Expr) -> (lex::Spanned<Event>, lex::Spanned<Event>) {
+fn expr_endpoints(stmt: &syn::Expr) -> (lex::Spanned<Event>, lex::Spanned<Event>) {
     let tokens = stmt.to_token_stream().into_iter().collect::<Vec<_>>();
 
     let TokenStart {

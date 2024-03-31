@@ -93,7 +93,7 @@ const JUNK: [&str; 81] = [
     "if true{};if true{};if true{};if true{};if true{};if true{};if true{};if true{};",
 ];
 
-/// Unformat a soruce file into lines of length `width`.
+/// Unformat a source file into lines of length `width`.
 ///
 /// ## Details
 /// This process strips comments, inserts no-op statements, and wraps expressions

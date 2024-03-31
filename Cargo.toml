@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anstyle = "1.0.6"
 anyhow = "1.0.79"
 clap = { version = "4.5.4", features = ["cargo"] }
 proc-macro2 = { version = "1.0.78", features = ["span-locations"] }

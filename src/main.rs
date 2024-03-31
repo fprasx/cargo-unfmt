@@ -2,12 +2,34 @@ use std::fs;
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 
+use anstyle::*;
 use anyhow::Context;
 use clap::Arg;
 use regex::bytes::Regex;
 use walkdir::WalkDir;
 
+// This is the theme cargo uses as of
+// https://github.com/rust-lang/cargo/commit/a59aba136aab5510c16b0750a36cbd9916f91796
+pub const HEADER: Style = AnsiColor::Green.on_default().effects(Effects::BOLD);
+pub const USAGE: Style = AnsiColor::Green.on_default().effects(Effects::BOLD);
+pub const LITERAL: Style = AnsiColor::Cyan.on_default().effects(Effects::BOLD);
+pub const PLACEHOLDER: Style = AnsiColor::Cyan.on_default();
+pub const ERROR: Style = AnsiColor::Red.on_default().effects(Effects::BOLD);
+pub const VALID: Style = AnsiColor::Cyan.on_default().effects(Effects::BOLD);
+pub const INVALID: Style = AnsiColor::Yellow.on_default().effects(Effects::BOLD);
+
 fn main() -> anyhow::Result<()> {
+    let styles = {
+        clap::builder::styling::Styles::styled()
+            .header(HEADER)
+            .usage(USAGE)
+            .literal(LITERAL)
+            .placeholder(PLACEHOLDER)
+            .error(ERROR)
+            .valid(VALID)
+            .invalid(INVALID)
+    };
+
     let cmd = clap::Command::new("cargo")
         .author("Felix Prasanna")
         .about("format code into perfect rectangles")
@@ -34,7 +56,9 @@ fn main() -> anyhow::Result<()> {
                         .help("ignore files that match regex")
                         .value_parser(clap::value_parser!(Regex)),
                 ),
-        );
+        )
+        .styles(styles);
+
     let matches = cmd.get_matches();
     let matches = match matches.subcommand() {
         Some(("unfmt", matches)) => matches,

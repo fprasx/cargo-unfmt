@@ -2,7 +2,7 @@ use std::io::Write;
 
 use crate::{
     ir::{Ir, RichToken},
-    lex::{Spanned, Token},
+    lex::Token,
     JUNK,
 };
 

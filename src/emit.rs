@@ -153,7 +153,7 @@ fn adjust_stmts_by(block: &mut [RichToken], n: usize, junks: &[usize]) {
     }
 }
 
-fn adjust_exprs(block: &mut Vec<RichToken>, width: usize) {
+fn adjust_exprs(block: &mut [RichToken], width: usize) {
     let len = block_len(block);
 
     let mut exprs = vec![];
@@ -184,7 +184,7 @@ fn adjust_exprs(block: &mut Vec<RichToken>, width: usize) {
 }
 
 /// Adjust exprs to add `n` characters.
-fn adjust_exprs_by(block: &mut Vec<RichToken>, n: usize, exprs: &[(usize, usize)]) {
+fn adjust_exprs_by(block: &mut [RichToken], n: usize, exprs: &[(usize, usize)]) {
     let iters = n / 2; // each addition adds two characters, ( and )
 
     let per_expr = iters / exprs.len();

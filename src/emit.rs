@@ -70,16 +70,16 @@ fn adjust_block(block: &mut Vec<RichToken>, width: usize) {
         block.pop();
     }
 
-    // Add in junk. Don't go past width - 2 as then we can't fill with a // comment
+    // Add in junk
     adjust_stmts(block, width);
 
     // Add in exprs
     adjust_exprs(block, width);
 
-    // If we're one away, add a space after first token
+    // If we're one away, add a space in the middle.
     let len = block_len(block);
     if len == width - 1 {
-        block.insert(1, RichToken::Spacer);
+        block.insert(block.len() / 2, RichToken::Spacer);
     }
 
     // Add comments to end of line
@@ -133,10 +133,20 @@ fn adjust_stmts(block: &mut [RichToken], width: usize) {
 }
 
 fn adjust_stmts_by(block: &mut [RichToken], n: usize, junks: &[usize]) {
-    for junk in junks.iter().cycle().take(n) {
+    let per_junk = n / junks.len();
+    let extra = n % junks.len();
+
+    for junk in junks {
+        if let RichToken::Junk(n) = block.get_mut(*junk).unwrap() {
+            *n += per_junk;
+        } else {
+            panic!("we already checked this is a junk")
+        }
+    }
+
+    for junk in junks.iter().take(extra) {
         if let RichToken::Junk(n) = block.get_mut(*junk).unwrap() {
             *n += 1;
-
         } else {
             panic!("we already checked this is a junk")
         }
@@ -175,20 +185,34 @@ fn adjust_exprs(block: &mut Vec<RichToken>, width: usize) {
 
 /// Adjust exprs to add `n` characters.
 fn adjust_exprs_by(block: &mut Vec<RichToken>, n: usize, exprs: &[(usize, usize)]) {
-    for expr in exprs.iter().cycle().take(n / 2) {
-        let (fst, snd) = expr;
-        if let RichToken::ExprOpen { reps, .. } = block.get_mut(*fst).unwrap() {
+    let iters = n / 2; // each addition adds two characters, ( and )
+
+    let per_expr = iters / exprs.len();
+    let extra = iters % exprs.len();
+
+    for (open, close) in exprs {
+        if let RichToken::ExprOpen { reps, .. } = block.get_mut(*open).unwrap() {
+            *reps += per_expr;
+        } else {
+            panic!("we already checked this is an expropen")
+        }
+        if let RichToken::ExprClose { reps, .. } = block.get_mut(*close).unwrap() {
+            *reps += per_expr;
+        } else {
+            panic!("we already checked this is an exprclose",)
+        }
+    }
+
+    for (open, close) in exprs.iter().take(extra) {
+        if let RichToken::ExprOpen { reps, .. } = block.get_mut(*open).unwrap() {
             *reps += 1;
         } else {
             panic!("we already checked this is an expropen")
         }
-        if let RichToken::ExprClose { reps, .. } = block.get_mut(*snd).unwrap() {
+        if let RichToken::ExprClose { reps, .. } = block.get_mut(*close).unwrap() {
             *reps += 1;
         } else {
-            panic!(
-                "we already checked this is an exprclose: {:?}",
-                block.get_mut(*snd)
-            )
+            panic!("we already checked this is an exprclose",)
         }
     }
 }

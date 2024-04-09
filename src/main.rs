@@ -1,5 +1,10 @@
 use std::fs;
+#[cfg(target_os = "linux")]
 use std::os::unix::ffi::OsStrExt;
+
+#[cfg(target_os = "windows")]
+use std::os::windows::ffi::OsStrExt;
+
 use std::path::PathBuf;
 
 use anstyle::*;
@@ -80,7 +85,13 @@ fn main() -> anyhow::Result<()> {
 
         let path = file.path();
 
+        #[cfg(target_os = "linux")]
         if re.is_some_and(|re| re.find(path.as_os_str().as_bytes()).is_some()) {
+            continue;
+        }
+
+        #[cfg(target_os = "windows")]
+        if re.is_some_and(|re| re.find(path.as_os_str().as_encoded_bytes()).is_some()) {
             continue;
         }
 

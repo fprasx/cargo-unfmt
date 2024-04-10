@@ -1,5 +1,5 @@
 use std::fs;
-#[cfg(target_os = "linux")]
+#[cfg(target_os = "unix")]
 use std::os::unix::ffi::OsStrExt;
 
 #[cfg(target_os = "windows")]
@@ -85,7 +85,7 @@ fn main() -> anyhow::Result<()> {
 
         let path = file.path();
 
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(target_os = "unix"))]
         if re.is_some_and(|re| re.find(path.as_os_str().as_bytes()).is_some()) {
             continue;
         }

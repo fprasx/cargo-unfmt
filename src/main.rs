@@ -85,8 +85,8 @@ fn main() -> anyhow::Result<()> {
 
         let path = file.path();
 
-        #[cfg(target_os = "unix")]
-        if re.is_some_and(|re| re.find(path.as_os_str().as_bytes()).is_some()) {
+        #[cfg(not(target_os = "windows"))]
+        if re.is_some_and(|re| re.find(path.as_os_str().as_encoded_bytes()).is_some()) {
             continue;
         }
 
